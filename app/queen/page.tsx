@@ -3,8 +3,15 @@
 import { useEffect, useState } from "react";
 import MultiRoleMessageForm from "../components/MultiRoleMessageForm";
 
+type Msg = {
+  author: string;
+  message: string;
+  timestamp: string;
+  files?: { name: string; url: string }[];
+};
+
 export default function QueenTemple() {
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [showTimestamps, setShowTimestamps] = useState(true);
   const [selectedRole, setSelectedRole] = useState("All");
   const [query, setQuery] = useState("");
@@ -12,7 +19,7 @@ export default function QueenTemple() {
   const loadMessages = async () => {
     const res = await fetch("/api/queen/messages");
     const data = await res.json();
-    setMessages(data);
+    setMessages(Array.isArray(data) ? data : []);
   };
 
   useEffect(() => {
@@ -24,24 +31,11 @@ export default function QueenTemple() {
     setMessages((prev) => prev.filter((msg) => msg.timestamp !== timestamp));
   };
 
-  const filteredMessages = messages.filter((msg) => {
+  const filtered = messages.filter((msg) => {
     const matchesRole = selectedRole === "All" || msg.author === selectedRole;
     const matchesQuery = msg.message?.toLowerCase().includes(query.toLowerCase());
     return matchesRole && matchesQuery;
   });
-
-  const handleDownload = () => {
-    const text = filteredMessages
-      .map((msg) => `[${new Date(msg.timestamp).toLocaleString()}] ${msg.author}: ${msg.message}`)
-      .join("\n");
-    const blob = new Blob([text], { type: "text/plain" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "queen-temple-messages.txt";
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
 
   return (
     <main className="min-h-screen bg-black text-white p-6">
@@ -52,7 +46,6 @@ export default function QueenTemple() {
         Messages of sovereignty, tenderness, and command.
       </div>
 
-      {/* Role filter pills */}
       <div className="flex gap-2 mb-4">
         {["All", "King", "Queen", "Princess"].map((role) => (
           <button
@@ -67,7 +60,6 @@ export default function QueenTemple() {
         ))}
       </div>
 
-      {/* Search */}
       <input
         type="text"
         placeholder="Search messages..."
@@ -76,10 +68,10 @@ export default function QueenTemple() {
         className="mt-2 px-3 py-1 border border-pink-500 bg-black text-white rounded w/full mb-4"
       />
 
-      {/* Multi-role sender with attachments */}
       <MultiRoleMessageForm
         author="Queen"
         defaultRecipients={["King", "Princess"]}
+        apiUrl="/api/queen/messages"
         onSent={loadMessages}
       />
 
@@ -87,14 +79,10 @@ export default function QueenTemple() {
         <button className="underline" onClick={() => setShowTimestamps(!showTimestamps)}>
           {showTimestamps ? "Hide Timestamps" : "Show Timestamps"}
         </button>
-        <button className="underline" onClick={handleDownload}>
-          ⬇️ Download All Messages as Text
-        </button>
       </div>
 
-      {/* Message list */}
-      {filteredMessages.map((msg, index) => (
-        <div key={index} className="border p-3 mb-2 rounded border-pink-500">
+      {filtered.map((msg) => (
+        <div key={msg.timestamp} className="border p-3 mb-2 rounded border-pink-500">
           {showTimestamps && (
             <div className="text-xs text-gray-400 mb-1">
               {new Date(msg.timestamp).toLocaleString()}
@@ -104,30 +92,45 @@ export default function QueenTemple() {
             <strong>{msg.author}:</strong> {msg.message}
           </p>
 
-          {/* Attachments with image previews */}
-          {msg.files?.length > 0 && (
+          {msg.files?.length ? (
             <div className="mt-2 space-y-2">
-              {msg.files.map((f: any, i: number) => {
-                const isImage = /\.(png|jpe?g|gif|webp)$/i.test(f.name);
-                return isImage ? (
-                  <div key={i}>
-                    <img
-                      src={f.url}
-                      alt={f.name}
-                      className="max-w-xs rounded border border-pink-500"
-                    />
-                    <a href={f.url} download className="block text-pink-400 hover:underline mt-1">
-                      📎 {f.name}
-                    </a>
+              {msg.files.map((f) => {
+                const isImage = /\.(png|jpe?g|gif|webp|avif)$/i.test(f.name);
+                const isPdf = /\.pdf$/i.test(f.name);
+                return (
+                  <div key={f.name}>
+                    {isImage ? (
+                      <>
+                        <img
+                          src={f.url}
+                          alt={f.name}
+                          className="max-w-xs rounded border border-pink-500"
+                        />
+                        <a href={f.url} download className="block text-pink-400 hover:underline mt-1">
+                          📎 {f.name}
+                        </a>
+                      </>
+                    ) : isPdf ? (
+                      <>
+                        <iframe
+                          src={f.url}
+                          className="w-full max-w-md h-64 rounded border border-pink-500"
+                          title={f.name}
+                        />
+                        <a href={f.url} download className="block text-pink-400 hover:underline mt-1">
+                          📎 {f.name}
+                        </a>
+                      </>
+                    ) : (
+                      <a href={f.url} className="text-pink-400 hover:underline" download>
+                        📎 {f.name}
+                      </a>
+                    )}
                   </div>
-                ) : (
-                  <a key={i} href={f.url} className="text-pink-400 hover:underline" download>
-                    📎 {f.name}
-                  </a>
                 );
               })}
             </div>
-          )}
+          ) : null}
 
           <button
             onClick={() => handleDelete(msg.timestamp)}
