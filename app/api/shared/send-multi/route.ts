@@ -1,36 +1,38 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { sendToRoles } from '@/lib/sendToRoles';
+ // C:\Users\steph\thebloodroom\app\api\shared\send-multi\route.ts
+import { NextResponse } from 'next/server';
+import type { SavedMessage, Role } from '@/lib/messages';
+import { writeMessageToRole, writeSingleVaultCopy } from '@/lib/messages';
 
-type Body = {
-  author: 'King' | 'Queen' | 'Princess';
-  message: string;
-  timestamp: string; // ISO string from the client
-  roles: ('King' | 'Queen' | 'Princess')[];
-};
-
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const ct = req.headers.get('content-type') || '';
-    if (!ct.includes('application/json')) {
-      return NextResponse.json({ error: 'Expected application/json' }, { status: 400 });
+    const body = await req.json();
+
+    // Normalize inbound payload from MultiRoleMessageForm
+    const msg: SavedMessage = {
+      author: body.author as Role,
+      recipients: Array.isArray(body.recipients) ? body.recipients as Role[] : [],
+      text: String(body.text || ''),
+      html: typeof body.html === 'string' ? body.html : undefined,
+      createdAt: String(body.createdAt || new Date().toISOString()),
+      attachments: Array.isArray(body.attachments) ? body.attachments : [],
+      meta: body.meta || {},
+    };
+
+    if (!msg.author || !msg.createdAt) {
+      return NextResponse.json({ ok: false, error: 'Invalid payload' }, { status: 400 });
     }
 
-    const body = (await req.json()) as Partial<Body>;
-    const { author, message, timestamp, roles } = body || {};
+    // 1) Write a single canonical copy to the Memory Vault
+    const vaultId = await writeSingleVaultCopy(msg);
 
-    if (!author || !message || !timestamp || !Array.isArray(roles) || roles.length === 0) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
-
-    // Map to our S3 writer (expects { text, author, timestamp })
-    await sendToRoles(
-      { text: String(message), author: String(author), timestamp: String(timestamp) },
-      roles as Body['roles']
+    // 2) Write one copy per recipient role (deterministic but unique file per write)
+    const writes = await Promise.all(
+      (msg.recipients || []).map((r) => writeMessageToRole(r as Role, msg))
     );
 
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error('POST /api/shared/send-multi failed:', err);
-    return NextResponse.json({ error: 'Failed to send' }, { status: 500 });
+    return NextResponse.json({ ok: true, vaultId, writes });
+  } catch (e: any) {
+    console.error('[send-multi] ERROR', e);
+    return NextResponse.json({ ok: false, error: e?.message || 'Failed' }, { status: 500 });
   }
 }

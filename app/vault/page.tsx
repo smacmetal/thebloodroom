@@ -1,16 +1,31 @@
+ // C:\Users\steph\thebloodroom\app\vault\page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 
+type ApiVaultEntry = {
+  // From /api/memory/entries
+  file?: string;            // filename on disk
+  path?: string;            // full path on disk
+  title?: string;
+  story?: string;
+  category?: string;        // e.g., 'tattoo' | 'album' | 'declaration' | ...
+  date?: string;            // 'YYYY-MM-DD'
+  mtime?: number;           // last modified time (ms) – fallback for sorting/age
+  parseError?: boolean;
+  __sort?: number;          // server-side sort key (optional)
+};
+
 type VaultEntry = {
-  id: string;            // from API: S3 key
+  id: string;               // stable UI key (derived from file/path)
   title: string;
   story?: string;
-  category?: string;     // tattoo | album | declaration | ritual | symbol | etc.
-  date?: string;         // human-friendly string
-  timestamp?: string;    // ISO string if present
-  file?: string;         // URL to file in S3 (optional)
+  category: string;
+  date?: string;            // 'YYYY-MM-DD'
+  timestamp?: string;       // ISO string, if we can derive one
+  file?: string;            // S3/file URL (optional; not provided by our API yet)
+  path?: string;            // local path (for debug)
 };
 
 const CATEGORY_ORDER = ['declaration', 'ritual', 'tattoo', 'album', 'symbol', 'other'];
@@ -52,15 +67,82 @@ function isPdfFile(url?: string) {
 
 export default function VaultPage() {
   const [entries, setEntries] = useState<VaultEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [showTimestamp, setShowTimestamp] = useState(true);
 
   useEffect(() => {
-    fetch('/api/memory/entries')
-      .then((res) => res.json())
-      .then((data: VaultEntry[]) => setEntries(Array.isArray(data) ? data : []))
-      .catch((err) => console.error('Error loading vault entries:', err));
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const res = await fetch('/api/memory/entries', { cache: 'no-store' });
+        if (!res.ok) {
+          setLoadError(`Vault fetch failed: HTTP ${res.status}`);
+          setEntries([]);
+          return;
+        }
+        let data: any = {};
+        try {
+          data = await res.json();
+        } catch (e: any) {
+          setLoadError(`Vault JSON parse error: ${e?.message || e}`);
+          setEntries([]);
+          return;
+        }
+        const apiEntries: ApiVaultEntry[] = Array.isArray(data?.entries)
+          ? (data.entries as ApiVaultEntry[])
+          : [];
+
+        const mapped: VaultEntry[] = apiEntries.map((e, i) => {
+          // Build a stable id: prefer filename, else path, else index
+          const id = e.file || e.path || `entry-${i}`;
+
+          // Try to derive a timestamp:
+          // - If API later returns explicit ISO, use it
+          // - Else if 'date' exists (YYYY-MM-DD), coerce to ISO midnight
+          // - Else if mtime provided, convert to ISO
+          let timestamp: string | undefined;
+          if (e.date && /^\d{4}-\d{2}-\d{2}$/.test(e.date)) {
+            timestamp = new Date(`${e.date}T00:00:00.000Z`).toISOString();
+          } else if (typeof e.mtime === 'number' && Number.isFinite(e.mtime)) {
+            timestamp = new Date(e.mtime).toISOString();
+          }
+
+          return {
+            id,
+            title: e.title || (e.file ?? 'Untitled'),
+            story: e.story,
+            category: (e.category || 'other').toLowerCase(),
+            date: e.date,
+            timestamp,
+            file: undefined, // not provided by local file API yet
+            path: e.path,
+          };
+        });
+
+        if (!cancelled) {
+          setEntries(mapped);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setLoadError(`Vault load error: ${err?.message || err}`);
+          setEntries([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filtered = useMemo(() => {
@@ -69,7 +151,8 @@ export default function VaultPage() {
       const matchesQuery =
         q === '' ||
         (e.title?.toLowerCase?.().includes(q) ?? false) ||
-        (e.story?.toLowerCase?.().includes(q) ?? false);
+        (e.story?.toLowerCase?.().includes(q) ?? false) ||
+        (e.category?.toLowerCase?.().includes(q) ?? false);
       const matchesCategory = categoryFilter.trim() === '' || e.category === categoryFilter;
       return matchesQuery && matchesCategory;
     });
@@ -93,8 +176,10 @@ export default function VaultPage() {
         return (a.title || '').localeCompare(b.title || '');
       });
     }
-    // Return groups in the desired order, any unknowns at the end
-    const orderedCats = [...CATEGORY_ORDER, ...[...map.keys()].filter(c => !CATEGORY_ORDER.includes(c))];
+    const orderedCats = [
+      ...CATEGORY_ORDER,
+      ...[...map.keys()].filter((c) => !CATEGORY_ORDER.includes(c)),
+    ];
     return orderedCats
       .filter((c) => map.has(c) && map.get(c)!.length > 0)
       .map((c) => ({ category: c, items: map.get(c)! }));
@@ -107,7 +192,7 @@ export default function VaultPage() {
     <div className="p-6 text-white">
       <h1 className="text-2xl font-bold mb-2">🔒 The Vault</h1>
       <p className="text-gray-400 mb-6">
-        Filtered archive of all temple messages from King, Queen, and Princess — grouped by category.
+        Filtered archive of our Trinity’s memories — grouped by category.
       </p>
 
       {/* Search + Filters */}
@@ -146,94 +231,107 @@ export default function VaultPage() {
         </a>
       </div>
 
+      {/* Loading / Error states */}
+      {loading && <p className="text-gray-400 italic">Loading entries…</p>}
+      {!loading && loadError && (
+        <p className="text-red-400">
+          {loadError}
+        </p>
+      )}
+
       {/* Grouped Lists */}
-      {grouped.length === 0 && (
+      {!loading && !loadError && grouped.length === 0 && (
         <p className="text-gray-400 italic">No entries found.</p>
       )}
 
-      <div className="space-y-10">
-        {grouped.map(({ category, items }) => (
-          <section key={category}>
-            <h2 className="text-xl font-semibold mb-4 capitalize text-pink-400">
-              {category}
-            </h2>
+      {!loading && !loadError && (
+        <div className="space-y-10">
+          {grouped.map(({ category, items }) => (
+            <section key={category}>
+              <h2 className="text-xl font-semibold mb-4 capitalize text-pink-400">
+                {category}
+              </h2>
 
-            <div className="space-y-6">
-              {items.map((entry, idx) => (
-                <div
-                  key={keyFor(entry, idx)}
-                  className="border border-gray-700 bg-gray-900 p-5 rounded-lg shadow-lg hover:border-pink-500 transition-colors"
-                >
-                  <h3 className="text-2xl font-bold text-white">{entry.title}</h3>
+              <div className="space-y-6">
+                {items.map((entry, idx) => (
+                  <div
+                    key={keyFor(entry, idx)}
+                    className="border border-gray-700 bg-gray-900 p-5 rounded-lg shadow-lg hover:border-pink-500 transition-colors"
+                  >
+                    <h3 className="text-2xl font-bold text-white">{entry.title}</h3>
 
-                  {showTimestamp && (
-                    <p className="text-sm text-gray-400 mb-3">
-                      {entry.timestamp || entry.date}
-                      {entry.timestamp && (
-                        <span className="ml-2 text-gray-500">
-                          ({timeAgo(entry.timestamp)})
-                        </span>
-                      )}
-                    </p>
-                  )}
+                    {showTimestamp && (entry.timestamp || entry.date) && (
+                      <p className="text-sm text-gray-400 mb-3">
+                        {entry.timestamp || entry.date}
+                        {entry.timestamp && (
+                          <span className="ml-2 text-gray-500">
+                            ({timeAgo(entry.timestamp)})
+                          </span>
+                        )}
+                      </p>
+                    )}
 
-                  {entry.story && (
-                    <p className="text-gray-300 whitespace-pre-line">{entry.story}</p>
-                  )}
+                    {entry.story && (
+                      <p className="text-gray-300 whitespace-pre-line">{entry.story}</p>
+                    )}
 
-                  {/* Basic previews (image/PDF) */}
-                  {entry.file && isImageFile(entry.file) && (
-                    <div className="mt-3">
-                      <div className="relative w-full max-w-md h-64">
-                        <Image
-                          src={entry.file}
-                          alt={entry.title}
-                          fill
-                          className="object-contain rounded border border-pink-500"
-                        />
+                    {/* When we start attaching files with URLs, these previews will light up */}
+                    {entry.file && isImageFile(entry.file) && (
+                      <div className="mt-3">
+                        <div className="relative w-full max-w-md h-64">
+                          <Image
+                            src={entry.file}
+                            alt={entry.title}
+                            fill
+                            className="object-contain rounded border border-pink-500"
+                          />
+                        </div>
+                        <a
+                          href={entry.file}
+                          download
+                          className="text-pink-400 hover:underline block mt-2"
+                        >
+                          📎 Download Image
+                        </a>
                       </div>
-                      <a
-                        href={entry.file}
-                        download
-                        className="text-pink-400 hover:underline block mt-2"
-                      >
-                        📎 Download Image
-                      </a>
-                    </div>
-                  )}
+                    )}
 
-                  {entry.file && isPdfFile(entry.file) && (
-                    <div className="mt-3">
-                      <iframe
-                        src={entry.file}
-                        className="w-full h-64 rounded border border-pink-500"
-                        title={entry.title}
-                      />
-                      <a
-                        href={entry.file}
-                        download
-                        className="text-pink-400 hover:underline block mt-2"
-                      >
-                        📎 Download PDF
-                      </a>
-                    </div>
-                  )}
+                    {entry.file && isPdfFile(entry.file) && (
+                      <div className="mt-3">
+                        <iframe
+                          src={entry.file}
+                          className="w-full h-64 rounded border border-pink-500"
+                          title={entry.title}
+                        />
+                        <a
+                          href={entry.file}
+                          download
+                          className="text-pink-400 hover:underline block mt-2"
+                        >
+                          📎 Download PDF
+                        </a>
+                      </div>
+                    )}
 
-                  {entry.file && !isImageFile(entry.file) && !isPdfFile(entry.file) && (
-                    <a
-                      href={entry.file}
-                      download
-                      className="text-pink-400 hover:underline block mt-3"
-                    >
-                      📎 Download Attachment
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
+                    {entry.file &&
+                      !isImageFile(entry.file) &&
+                      !isPdfFile(entry.file) && (
+                        <a
+                          href={entry.file}
+                          download
+                          className="text-pink-400 hover:underline block mt-3"
+                        >
+                          📎 Download Attachment
+                        </a>
+                      )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
+

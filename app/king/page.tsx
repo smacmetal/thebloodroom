@@ -1,44 +1,57 @@
 'use client';
 
-import { useEffect, useState } from "react";
-import MultiRoleMessageForm from "../components/MultiRoleMessageForm";
+import WallGallery from '@/app/components/WallGallery';
+import { useEffect, useState } from 'react';
+import MultiRoleMessageForm from '../components/MultiRoleMessageForm';
+
+type Msg = {
+  author: string;
+  message: string;
+  timestamp: string;
+  files?: { name: string; url: string }[];
+};
 
 export default function KingTemple() {
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [showTimestamps, setShowTimestamps] = useState(true);
-  const [selectedRole, setSelectedRole] = useState("All");
-  const [query, setQuery] = useState("");
+  const [selectedRole, setSelectedRole] = useState('All');
+  const [query, setQuery] = useState('');
 
-  const loadMessages = async () => {
-    const res = await fetch("/api/king/messages");
-    const data = await res.json();
-    setMessages(data);
-  };
+  async function loadMessages() {
+    try {
+      const res = await fetch('/api/king/messages', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json().catch(() => []);
+      setMessages(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error('loadMessages failed:', e);
+      setMessages([]);
+    }
+  }
 
-  useEffect(() => {
-    loadMessages();
-  }, []);
+  useEffect(() => { loadMessages(); }, []);
 
   const handleDelete = async (timestamp: string) => {
-    await fetch(`/api/king/messages?timestamp=${timestamp}`, { method: "DELETE" });
+    await fetch(`/api/king/messages?timestamp=${timestamp}`, { method: 'DELETE' });
     setMessages((prev) => prev.filter((msg) => msg.timestamp !== timestamp));
   };
 
-  const filteredMessages = messages.filter((msg) => {
-    const matchesRole = selectedRole === "All" || msg.author === selectedRole;
-    const matchesQuery = msg.message?.toLowerCase().includes(query.toLowerCase());
+  const filteredMessages = (messages || []).filter((msg) => {
+    const matchesRole = selectedRole === 'All' || msg.author === selectedRole;
+    const text = (msg.message ?? '').toString().toLowerCase();
+    const matchesQuery = query ? text.includes(query.toLowerCase()) : true;
     return matchesRole && matchesQuery;
   });
 
   const handleDownload = () => {
     const text = filteredMessages
-      .map((msg) => `[${new Date(msg.timestamp).toLocaleString()}] ${msg.author}: ${msg.message}`)
-      .join("\n");
-    const blob = new Blob([text], { type: "text/plain" });
+      .map((m) => `[${new Date(m.timestamp).toLocaleString()}] ${m.author}: ${m.message}`)
+      .join('\n');
+    const blob = new Blob([text], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
-    a.download = "king-temple-messages.txt";
+    a.download = 'king-temple-messages.txt';
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -46,46 +59,57 @@ export default function KingTemple() {
   return (
     <main className="min-h-screen bg-black text-white p-6">
       <h1 className="text-4xl font-bold text-red-500 mb-2 flex items-center gap-2">
-        King's Temple <span role="img" aria-label="crown">👑</span>
+        King&apos;s Temple <span role="img" aria-label="crown">👑</span>
       </h1>
       <div className="mb-6 text-lg text-red-200">
         Messages of sovereignty, devotion, and sacred truth.
       </div>
 
-      {/* Role filter pills */}
-      <div className="flex gap-2 mb-4">
-        {["All", "King", "Queen", "Princess"].map((role) => (
-          <button
-            key={role}
-            onClick={() => setSelectedRole(role)}
-            className={`px-3 py-1 rounded border ${
-              selectedRole === role ? "bg-red-500 text-black" : "border-red-500"
-            }`}
-          >
-            {role}
-          </button>
-        ))}
-      </div>
+      {/* Top row: filters + search on the left, wall strip on the right */}
+      <div className="flex flex-col lg:flex-row lg:items-start gap-6 mb-6">
+        <div className="flex-1">
+          {/* Role filter pills */}
+          <div className="flex gap-2 mb-3">
+            {['All', 'King', 'Queen', 'Princess'].map((role) => (
+              <button
+                key={role}
+                onClick={() => setSelectedRole(role)}
+                className={`px-3 py-1 rounded border ${
+                  selectedRole === role ? 'bg-red-500 text-black' : 'border-red-500'
+                }`}
+              >
+                {role}
+              </button>
+            ))}
+          </div>
 
-      {/* Search */}
-      <input
-        type="text"
-        placeholder="Search messages..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="mt-2 px-3 py-1 border border-red-500 bg-black text-white rounded w-full mb-4"
-      />
+          {/* Search */}
+          <input
+            type="text"
+            placeholder="Search messages..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="mt-2 px-3 py-1 border border-red-500 bg-black text-white rounded w-full"
+          />
+        </div>
+
+        {/* Right rail: temple wall strip */}
+        <div className="w-full lg:w-[560px]">
+          <WallGallery role="King" variant="strip" limit={15} />
+        </div>
+      </div>
 
       {/* Multi-role sender with attachments */}
       <MultiRoleMessageForm
         author="King"
-        defaultRecipients={["Queen", "Princess"]}
+        apiUrl="/api/king/messages"
+        defaultRecipients={['Queen', 'Princess']}
         onSent={loadMessages}
       />
 
       <div className="flex items-center justify-between mt-4 mb-2">
         <button className="underline" onClick={() => setShowTimestamps(!showTimestamps)}>
-          {showTimestamps ? "Hide Timestamps" : "Show Timestamps"}
+          {showTimestamps ? 'Hide Timestamps' : 'Show Timestamps'}
         </button>
         <button className="underline" onClick={handleDownload}>
           ⬇️ Download All Messages as Text
@@ -93,8 +117,8 @@ export default function KingTemple() {
       </div>
 
       {/* Message list */}
-      {filteredMessages.map((msg, index) => (
-        <div key={index} className="border p-3 mb-2 rounded border-red-500">
+      {filteredMessages.map((msg) => (
+        <div key={msg.timestamp} className="border p-3 mb-2 rounded border-red-500">
           {showTimestamps && (
             <div className="text-xs text-gray-400 mb-1">
               {new Date(msg.timestamp).toLocaleString()}
@@ -104,39 +128,43 @@ export default function KingTemple() {
             <strong>{msg.author}:</strong> {msg.message}
           </p>
 
-          {/* Attachments with image previews */}
-          {msg.files?.length > 0 && (
+          {/* Attachments with image/PDF previews */}
+          {msg.files?.length ? (
             <div className="mt-2 space-y-2">
-              {msg.files.map((f: any, i: number) => {
-                const isImage = /\.(png|jpe?g|gif|webp)$/i.test(f.name);
-                return isImage ? (
-                  <div key={i}>
-                    <img
-                      src={f.url}
-                      alt={f.name}
-                      className="max-w-xs rounded border border-red-500"
-                    />
-                    <a
-                      href={f.url}
-                      download
-                      className="block text-red-400 hover:underline mt-1"
-                    >
-                      📎 {f.name}
-                    </a>
+              {msg.files.map((f, i) => {
+                const isImage = /\.(png|jpe?g|gif|webp|avif)$/i.test(f.name);
+                const isPdf = /\.pdf$/i.test(f.name);
+                const key = `${msg.timestamp}:${f.name}:${i}`;
+                return (
+                  <div key={key}>
+                    {isImage ? (
+                      <>
+                        <img src={f.url} alt={f.name} className="max-w-xs rounded border border-red-500" />
+                        <a href={f.url} download className="block text-red-400 hover:underline mt-1">
+                          📎 {f.name}
+                        </a>
+                      </>
+                    ) : isPdf ? (
+                      <>
+                        <iframe
+                          src={f.url}
+                          className="w-full max-w-md h-64 rounded border border-red-500"
+                          title={f.name}
+                        />
+                        <a href={f.url} download className="block text-red-400 hover:underline mt-1">
+                          📎 {f.name}
+                        </a>
+                      </>
+                    ) : (
+                      <a href={f.url} className="text-red-400 hover:underline" download>
+                        📎 {f.name}
+                      </a>
+                    )}
                   </div>
-                ) : (
-                  <a
-                    key={i}
-                    href={f.url}
-                    className="text-red-400 hover:underline"
-                    download
-                  >
-                    📎 {f.name}
-                  </a>
                 );
               })}
             </div>
-          )}
+          ) : null}
 
           <button
             onClick={() => handleDelete(msg.timestamp)}
@@ -149,3 +177,4 @@ export default function KingTemple() {
     </main>
   );
 }
+ 

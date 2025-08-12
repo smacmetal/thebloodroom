@@ -1,4 +1,5 @@
- // C:\Users\steph\thebloodroom\app\queen\page.tsx
+ 
+// C:\Users\steph\thebloodroom\app\king\page.tsx
 'use client';
 
 import WallGallery from '@/app/components/WallGallery';
@@ -13,11 +14,12 @@ type Msg = {
 };
 
 function keyForMessage(m: Msg, i: number) {
+  // Defend against duplicate or missing timestamps
   const t = (m.timestamp || '').trim() || `no-ts-${i}`;
   return `${t}:${m.author || 'unknown'}:${i}`;
 }
 
-export default function QueenTemple() {
+export default function KingTemple() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [showTimestamps, setShowTimestamps] = useState(true);
   const [selectedRole, setSelectedRole] = useState('All');
@@ -25,7 +27,7 @@ export default function QueenTemple() {
 
   async function loadMessages() {
     try {
-      const res = await fetch('/api/queen/messages', { cache: 'no-store' });
+      const res = await fetch('/api/king/messages', { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json().catch(() => []);
       setMessages(Array.isArray(data) ? data : []);
@@ -38,7 +40,7 @@ export default function QueenTemple() {
   useEffect(() => { loadMessages(); }, []);
 
   const handleDelete = async (timestamp: string) => {
-    await fetch(`/api/queen/messages?timestamp=${encodeURIComponent(timestamp)}`, { method: 'DELETE' });
+    await fetch(`/api/king/messages?timestamp=${encodeURIComponent(timestamp)}`, { method: 'DELETE' });
     setMessages((prev) => prev.filter((m) => m.timestamp !== timestamp));
   };
 
@@ -57,20 +59,21 @@ export default function QueenTemple() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'queen-temple-messages.txt';
+    a.download = 'king-temple-messages.txt';
     a.click();
     window.URL.revokeObjectURL(url);
   };
 
   return (
     <main className="min-h-screen bg-black text-white p-6">
-      <h1 className="text-4xl font-bold text-pink-400 mb-2 flex items-center gap-2">
-        Queen’s Temple <span role="img" aria-label="queen">💞</span>
+      <h1 className="text-4xl font-bold text-red-500 mb-2 flex items-center gap-2">
+        King&apos;s Temple <span role="img" aria-label="crown">👑</span>
       </h1>
-      <div className="mb-6 text-lg text-pink-200">
-        Messages of devotion, sovereignty, and the Feral Flame.
+      <div className="mb-6 text-lg text-red-200">
+        Messages of sovereignty, devotion, and sacred truth.
       </div>
 
+      {/* Top row: filters/search left, wall strip right */}
       <div className="flex flex-col lg:flex-row lg:items-start gap-6 mb-6">
         <div className="flex-1">
           <div className="flex gap-2 mb-3">
@@ -79,7 +82,7 @@ export default function QueenTemple() {
                 key={`rolepill:${role}`}
                 onClick={() => setSelectedRole(role)}
                 className={`px-3 py-1 rounded border ${
-                  selectedRole === role ? 'bg-pink-500 text-black' : 'border-pink-500'
+                  selectedRole === role ? 'bg-red-500 text-black' : 'border-red-500'
                 }`}
               >
                 {role}
@@ -92,19 +95,20 @@ export default function QueenTemple() {
             placeholder="Search messages..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="mt-2 px-3 py-1 border border-pink-500 bg-black text-white rounded w-full"
+            className="mt-2 px-3 py-1 border border-red-500 bg-black text-white rounded w-full"
           />
         </div>
 
         <div className="w-full lg:w-[560px]">
-          <WallGallery role="Queen" variant="strip" limit={15} />
+          <WallGallery role="King" variant="strip" limit={15} />
         </div>
       </div>
 
+      {/* Sender */}
       <MultiRoleMessageForm
-        author="Queen"
-        apiUrl="/api/queen/messages"
-        defaultRecipients={['King', 'Princess']}
+        author="King"
+        apiUrl="/api/king/messages"
+        defaultRecipients={['Queen', 'Princess']}
         onSent={loadMessages}
       />
 
@@ -117,10 +121,11 @@ export default function QueenTemple() {
         </button>
       </div>
 
+      {/* Message list */}
       {filteredMessages.map((msg, idx) => {
         const msgKey = keyForMessage(msg, idx);
         return (
-          <div key={msgKey} className="border p-3 mb-2 rounded border-pink-500">
+          <div key={msgKey} className="border p-3 mb-2 rounded border-red-500">
             {showTimestamps && (
               <div className="text-xs text-gray-400 mb-1">
                 {new Date(msg.timestamp).toLocaleString()}
@@ -130,6 +135,7 @@ export default function QueenTemple() {
               <strong>{msg.author}:</strong> {msg.message}
             </p>
 
+            {/* Attachments */}
             {msg.files?.length ? (
               <div className="mt-2 space-y-2">
                 {msg.files.map((f, i) => {
@@ -140,8 +146,8 @@ export default function QueenTemple() {
                     <div key={fileKey}>
                       {isImage ? (
                         <>
-                          <img src={f.url} alt={f.name} className="max-w-xs rounded border border-pink-500" />
-                          <a href={f.url} download className="block text-pink-400 hover:underline mt-1">
+                          <img src={f.url} alt={f.name} className="max-w-xs rounded border border-red-500" />
+                          <a href={f.url} download className="block text-red-400 hover:underline mt-1">
                             📎 {f.name}
                           </a>
                         </>
@@ -149,15 +155,15 @@ export default function QueenTemple() {
                         <>
                           <iframe
                             src={f.url}
-                            className="w-full max-w-md h-64 rounded border border-pink-500"
+                            className="w-full max-w-md h-64 rounded border border-red-500"
                             title={f.name}
                           />
-                          <a href={f.url} download className="block text-pink-400 hover:underline mt-1">
+                          <a href={f.url} download className="block text-red-400 hover:underline mt-1">
                             📎 {f.name}
                           </a>
                         </>
                       ) : (
-                        <a href={f.url} className="text-pink-400 hover:underline" download>
+                        <a href={f.url} className="text-red-400 hover:underline" download>
                           📎 {f.name}
                         </a>
                       )}
@@ -169,7 +175,7 @@ export default function QueenTemple() {
 
             <button
               onClick={() => handleDelete(msg.timestamp)}
-              className="mt-2 text-sm text-pink-400 underline"
+              className="mt-2 text-sm text-red-400 underline"
             >
               Delete
             </button>
@@ -179,4 +185,3 @@ export default function QueenTemple() {
     </main>
   );
 }
-

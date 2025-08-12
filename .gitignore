@@ -7,3 +7,5 @@ uploads/
 .env*
 .DS_Store
 *.tsbuildinfo
+
+.vercel
