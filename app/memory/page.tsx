@@ -1,59 +1,68 @@
-'use client';
+ // C:\Users\steph\thebloodroom\app\memory\page.tsx
+"use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
-interface MemoryEntry {
-  title: string;
-  date: string;
-  category: string;
-  content: string;
-}
+type Entry = {
+  id: string;
+  title?: string;
+  text?: string;
+  content?: string;
+  timestamp: number | string;
+};
 
-export default function MemoryVaultPage() {
-  const [entries, setEntries] = useState<MemoryEntry[]>([]);
-  const [error, setError] = useState(false);
+export default function MemoryPage() {
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchEntries() {
-      try {
-        const res = await fetch('/api/memory/entries');
-        const data = await res.json();
+  async function fetchEntries() {
+    setError(null);
+    try {
+      const res = await fetch("/api/memory/entries", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
 
-        if (Array.isArray(data)) {
-          setEntries(data);
-        } else {
-          throw new Error('Invalid data format');
-        }
-      } catch (err) {
-        console.error('Error loading entries:', err);
-        setError(true);
-      }
+      // Accept either { entries: [...] } or just [...]
+      const list: unknown = Array.isArray(json) ? json : json?.entries;
+      if (!Array.isArray(list)) throw new Error("Invalid data format");
+
+      const normalized: Entry[] = list.map((e: any) => ({
+        id: String(e.id ?? crypto.randomUUID()),
+        title: e.title ?? "",
+        text: e.text ?? e.content ?? "",
+        timestamp: e.timestamp ?? Date.now(),
+      }));
+
+      setEntries(normalized);
+    } catch (e: any) {
+      setError(e?.message || "Failed to load");
+      setEntries([]);
     }
-
-    fetchEntries();
-  }, []);
-
-  if (error) {
-    return <div className="p-4 text-red-500">Failed to load memories.</div>;
   }
 
+  useEffect(() => { fetchEntries(); }, []);
+
   return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold mb-4">🧠 Memory Vault</h1>
-	<p className="text-gray-400 mb-6">
-  	Permanent archive of sacred moments, events, and symbols.
-	</p>
-      {entries.length === 0 ? (
-        <p>No entries found.</p>
-      ) : (
-        entries.map((entry) => (
-          <div key={entry.date} className="p-4 bg-gray-800 rounded shadow">
-            <h2 className="text-xl font-semibold">{entry.title}</h2>
-            <p className="text-sm text-gray-400">{entry.date} • {entry.category}</p>
-            <p className="mt-2">{entry.content}</p>
+    <main className="min-h-screen bg-black text-white p-6">
+      <h1 className="text-2xl font-semibold mb-4">Memory Entries</h1>
+
+      {error ? <div className="text-red-400 mb-3">{error}</div> : null}
+
+      <div className="space-y-3">
+        {entries.map((e) => (
+          <div key={e.id} className="border border-pink-500 rounded p-3">
+            <div className="text-xs opacity-60">
+              {new Date(Number(e.timestamp)).toLocaleString()}
+            </div>
+            {e.title ? <div className="font-semibold">{e.title}</div> : null}
+            <div className="whitespace-pre-wrap">{e.text}</div>
           </div>
-        ))
-      )}
-    </div>
+        ))}
+        {!entries.length && !error ? (
+          <div className="opacity-70">No entries yet.</div>
+        ) : null}
+      </div>
+    </main>
   );
 }
+

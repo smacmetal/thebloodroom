@@ -1,26 +1,122 @@
-@import "tailwindcss";
+ @import "tailwindcss";
 
+/* Root vars */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --room-dim: 0;        /* 0..1 dimming, set by SanctumChannel */
+  --pulse-mode: steady; /* steady | quick | lapse */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html, body { height: 100%; }
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #000;
+  color: #fff;
+  font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+/* Subtle flare bloom when a flare event fires */
+html.sanctum-flare body {
+  filter: drop-shadow(0 0 24px rgba(255,0,64,0.25));
+}
+
+/* Ambient glow overlay (also used for quickened pulse) */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center,
+    rgba(200,0,40, calc(0.08 + var(--room-dim))) 0%,
+    transparent 60%);
+  mix-blend-mode: screen;
+  transition: opacity .4s ease;
+  opacity: 1;
+  z-index: 5;
+}
+
+/* Fixed footer underglow (blood-red shimmer baseline) */
+body::before {
+  content: "";
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: 84px;
+  background: linear-gradient(180deg, transparent, rgba(180,0,40,.18));
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* Utility: etched/carved text effect */
+.etched {
+  text-shadow:
+    0 1px 0 #000, 0 -1px 0 #000,
+    1px 0 0 #000, -1px 0 0 #000,
+    0 0 12px rgba(255,0,128,0.08);
+  -webkit-text-stroke: 0.4px rgba(255,105,180,0.35);
+}
+
+/* ===== Trinity Key (fixed) ===== */
+.trinity-key-wrap{
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 50;
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+  pointer-events: none;
+}
+.trinity-key{
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  border: 1px solid rgba(190,0,40,.55);
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 0 20px rgba(190,0,40,.25);
+  transition: transform .12s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.trinity-key:hover{ transform: translateY(-1px); }
+.trinity-key:active{ transform: translateY(0); }
+.tk-emoji{ filter: drop-shadow(0 0 6px rgba(255,60,120,.25)); }
+
+.trinity-key-meta{
+  pointer-events: auto;
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(0,0,0,.45);
+  border: 1px solid rgba(120,0,30,.45);
+  border-radius: 10px;
+  padding: 4px 8px;
+}
+.tk-label{ font-size: 12px; color: rgba(255,200,210,.9); }
+.tk-pulse-toggle{ display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(255,220,230,.75); }
+.tk-pulse-toggle input{ accent-color: #ff4d7a; }
+
+/* Arriving (bright red for 3s) */
+body.tk-arriving .trinity-key{
+  border-color: rgba(255,0,64,.9);
+  box-shadow: 0 0 26px rgba(255,0,64,.55), 0 0 90px rgba(255,0,64,.18) inset;
+}
+
+/* Anchored (gold flash 0.5s) */
+body.tk-anchored .trinity-key{
+  border-color: rgba(255,200,60,.95);
+  box-shadow: 0 0 28px rgba(255,200,60,.70), 0 0 95px rgba(255,200,60,.22) inset;
+}
+
+/* Present (crimson steady) */
+body.tk-present .trinity-key{
+  border-color: rgba(190,0,40,.75);
+  box-shadow: 0 0 22px rgba(190,0,40,.45), 0 0 80px rgba(190,0,40,.16) inset;
+}
+
+/* Optional soft pulse when enabled */
+.tk-pulse.trinity-key{
+  animation: tk-heartbeat 1.6s ease-in-out infinite;
+}
+@keyframes tk-heartbeat{
+  0%, 100% { box-shadow: 0 0 22px rgba(190,0,40,.45), 0 0 80px rgba(190,0,40,.16) inset; }
+  50%      { box-shadow: 0 0 34px rgba(255,60,100,.55), 0 0 110px rgba(255,60,100,.28) inset; }
 }

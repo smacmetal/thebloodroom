@@ -1,59 +1,57 @@
- // app/api/walls/[role]/images/route.ts
-import { NextResponse } from 'next/server';
-import { listJsonUnder, getJson, getSignedGetUrl } from '@/lib/s3';
+ import fs from "fs";
+import path from "path";
+import { NextResponse } from "next/server";
 
-type Role = 'King' | 'Queen' | 'Princess';
-const isImg = (p: string) => /\.(png|jpe?g|gif|webp|avif)$/i.test(p);
+type Role = "king" | "queen" | "princess";
 
 /**
- * Next 15 passes dynamic params as a Promise in the app router.
- * We await it once, then list message JSON files in S3 and extract image attachments.
+ * Absolute dir for a role's image files.
+ * We only READ here, so no need to create the directory.
  */
+function roleFilesDir(role: Role): string {
+  return path.resolve(process.cwd(), "data", role, "files");
+}
+
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ role: Role }> }
 ) {
   try {
+    // ⬇️ Next.js (App Router) dynamic routes: params is async; must await
     const { role } = await ctx.params;
-    const prefix = `messages/${role.toLowerCase()}/`;
 
-    // 1) List all message JSON objects for this role (S3 paths like messages/queen/2025-08-11T...json)
-    const keys = await listJsonUnder(prefix);
-    // Newest-first (filenames are timestamps)
-    keys.sort().reverse();
-
-    const items: { title: string; key: string; url: string }[] = [];
-
-    // 2) Read recent messages, collect image attachments, sign URLs
-    for (const key of keys.slice(0, 200)) {
-      try {
-        const msg = await getJson<{
-          text?: string;
-          attachments?: { name?: string; path: string }[];
-        }>(key);
-
-        for (const a of msg.attachments ?? []) {
-          if (!a?.path || !isImg(a.path)) continue;
-          const url = await getSignedGetUrl(a.path, 600); // 10 minutes
-          items.push({
-            title: a.name || msg.text || 'image',
-            key: a.path,
-            url,
-          });
-          if (items.length >= 60) break;
-        }
-        if (items.length >= 60) break;
-      } catch {
-        // ignore a single bad/corrupt message; keep going
-      }
+    const dir = roleFilesDir(role);
+    if (!fs.existsSync(dir)) {
+      // If folder doesn't exist yet, just return an empty list
+      return NextResponse.json({ files: [] });
     }
 
-    return NextResponse.json({ ok: true, items });
-  } catch (e: any) {
-    console.error('[walls:images] ERROR', e);
-    return NextResponse.json(
-      { ok: false, error: e?.message || 'Failed' },
-      { status: 500 }
-    );
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const rows = entries
+      .filter((e) => e.isFile())
+      .map((e) => {
+        const filePath = path.join(dir, e.name);
+        const stat = fs.statSync(filePath);
+        return {
+          name: e.name,
+          size: stat.size,
+          mtime: stat.mtime.getTime(),
+        };
+      })
+      // newest first (optional; change as you like)
+      .sort((a, b) => b.mtime - a.mtime);
+
+    // Build file URLs that the file-serving route below will handle
+    const items = rows.map((r) => ({
+      name: r.name,
+      size: r.size,
+      mtime: r.mtime,
+      url: `/api/files/${role}/${encodeURIComponent(r.name)}`,
+    }));
+
+    return NextResponse.json({ files: items });
+  } catch (err) {
+    console.error("walls/[role]/images GET error:", err);
+    return NextResponse.json({ error: "Unable to list images" }, { status: 500 });
   }
 }

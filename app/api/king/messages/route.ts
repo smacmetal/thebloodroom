@@ -1,84 +1,133 @@
- import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-import { randomUUID } from 'crypto';
-import { getSignedGetUrl } from '@/lib/s3';
-import { safeStamp } from '@/lib/idempotency';
+ import { NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
 
-const ROOT = path.join(process.cwd(), 'data', 'king', 'messages');
+const ROOT = process.cwd();
+const MESSAGES_DIR = path.join(ROOT, "data", "king", "messages");
 
-type Saved = {
-  author: 'King'|'Queen'|'Princess';
-  recipients: ('King'|'Queen'|'Princess')[];
-  text: string;
-  createdAt: string; // ISO
-  attachments?: { name: string; path: string }[];
-  meta?: any;
-};
-
-export async function GET() {
-  await fs.mkdir(ROOT, { recursive: true });
-  const files = (await fs.readdir(ROOT)).filter(f => f.endsWith('.json')).sort().reverse();
-  const out: any[] = [];
-
-  for (const f of files.slice(0, 200)) {
-    try {
-      const raw = await fs.readFile(path.join(ROOT, f), 'utf8');
-      const msg: Saved = JSON.parse(raw);
-      const filesSigned = await Promise.all(
-        (msg.attachments || []).map(async a => ({
-          name: a.name,
-          url: await getSignedGetUrl(a.path, 600),
-        }))
-      );
-      out.push({
-        author: msg.author,
-        message: msg.text,
-        timestamp: msg.createdAt,
-        files: filesSigned,
-      });
-    } catch { /* ignore bad files */ }
-  }
-
-  return NextResponse.json(out);
+// ---------- helpers ----------
+function ensureDir(p: string) {
+  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 }
 
+function parseIsoOrNull(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const t = Date.parse(value);
+  return Number.isNaN(t) ? null : new Date(t).toISOString();
+}
+
+function epochFromFilenameMs(fname: string): number | null {
+  const runs = (fname.match(/\d+/g) || []).sort((a, b) => b.length - a.length);
+  if (!runs.length) return null;
+  const msRun = runs.find((r) => r.length === 13);
+  if (msRun && Number.isFinite(Number(msRun))) return Number(msRun);
+  const sRun = runs.find((r) => r.length === 10);
+  if (sRun && Number.isFinite(Number(sRun))) return Number(sRun) * 1000;
+  return null;
+}
+
+function safeTimestamp(fullPath: string, fname: string, j: any): string {
+  let iso = parseIsoOrNull(j?.timestamp);
+  if (!iso) {
+    const ms = epochFromFilenameMs(fname);
+    if (ms && Number.isFinite(ms)) {
+      const d = new Date(ms);
+      if (!Number.isNaN(d.getTime())) iso = d.toISOString();
+    }
+  }
+  if (!iso) {
+    try {
+      const stat = fs.statSync(fullPath);
+      iso = new Date(stat.mtimeMs).toISOString();
+    } catch {
+      iso = new Date().toISOString();
+    }
+  }
+  return iso!;
+}
+
+// ---------- GET ----------
+export async function GET() {
+  try {
+    ensureDir(MESSAGES_DIR);
+    const entries = fs.readdirSync(MESSAGES_DIR, { withFileTypes: true });
+
+    const messages = entries
+      .filter((ent) => ent.isFile())
+      .filter((ent) => ent.name.toLowerCase().endsWith(".json"))
+      .map((ent) => {
+        const fname = ent.name;
+        const full = path.join(MESSAGES_DIR, fname);
+        let j: any = {};
+        try {
+          j = JSON.parse(fs.readFileSync(full, "utf8"));
+        } catch {
+          j = { id: path.parse(fname).name, body: "[Invalid JSON]" };
+        }
+        const timestamp = safeTimestamp(full, fname, j);
+        return {
+          id: j.id ?? path.parse(fname).name,
+          author: j.author ?? "King",
+          body: j.body ?? "",
+          title: typeof j.title === "string" ? j.title : "",
+          timestamp,
+          files: Array.isArray(j.files) ? j.files : [],
+          recipients: Array.isArray(j.recipients) ? j.recipients : [],
+        };
+      })
+      .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
+
+    return NextResponse.json({ messages }, { status: 200 });
+  } catch (err) {
+    console.error("Error reading King messages:", err);
+    return NextResponse.json({ error: "Failed to read messages" }, { status: 500 });
+  }
+}
+
+// ---------- POST ----------
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const payload: Saved = {
-      author: body.author,
-      recipients: Array.isArray(body.recipients) ? body.recipients : [],
-      text: String(body.text || ''),
-      createdAt: String(body.createdAt || new Date().toISOString()),
-      attachments: Array.isArray(body.attachments) ? body.attachments : [],
-      meta: body.meta || {},
+    ensureDir(MESSAGES_DIR);
+    const data = await req.json().catch(() => ({}));
+
+    const now = Date.now();
+    const id = `${now}-king`;
+    const payload = {
+      id,
+      author: data.author ?? "King",
+      title: typeof data.title === "string" ? data.title : "",
+      body: typeof data.body === "string" ? data.body : "",
+      recipients: Array.isArray(data.recipients) ? data.recipients : ["King"],
+      files: Array.isArray(data.files) ? data.files : [],
+      timestamp: new Date(now).toISOString(),
     };
 
-    await fs.mkdir(ROOT, { recursive: true });
+    const outfile = path.join(MESSAGES_DIR, `${id}.json`);
+    fs.writeFileSync(outfile, JSON.stringify(payload, null, 2), "utf8");
 
-    // Always write a unique file (avoid overwrites)
-    const base = safeStamp(payload.createdAt || new Date().toISOString());
-    const file = `${base}-${randomUUID()}.json`;
-    await fs.writeFile(path.join(ROOT, file), JSON.stringify(payload, null, 2), 'utf8');
-
-    return NextResponse.json({ ok: true, id: file });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || 'Failed' }, { status: 500 });
+    return NextResponse.json({ ok: true, message: payload }, { status: 201 });
+  } catch (err) {
+    console.error("Error writing King message:", err);
+    return NextResponse.json({ error: "Failed to save message" }, { status: 500 });
   }
 }
 
+// ---------- DELETE ?id= ----------
 export async function DELETE(req: Request) {
-  const url = new URL(req.url);
-  const ts = url.searchParams.get('timestamp');
-  if (!ts) return NextResponse.json({ ok: false, error: 'Missing timestamp' }, { status: 400 });
   try {
-    // remove any file that starts with the safeStamp(ts) (handles UUID suffix)
-    const prefix = `${safeStamp(ts)}`;
-    const files = (await fs.readdir(ROOT)).filter(f => f.startsWith(prefix) && f.endsWith('.json'));
-    await Promise.all(files.map(f => fs.unlink(path.join(ROOT, f))));
-    return NextResponse.json({ ok: true, deleted: files.length });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || 'Delete failed' }, { status: 500 });
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    }
+    const target = path.join(MESSAGES_DIR, `${id}.json`);
+    if (fs.existsSync(target)) {
+      fs.unlinkSync(target);
+      return NextResponse.json({ ok: true }, { status: 200 });
+    }
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  } catch (err) {
+    console.error("Error deleting King message:", err);
+    return NextResponse.json({ error: "Failed to delete message" }, { status: 500 });
   }
 }

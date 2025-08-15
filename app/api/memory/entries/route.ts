@@ -1,20 +1,53 @@
- import { NextResponse } from 'next/server';
-import { listObjects, getObjectJSON } from '@/lib/s3-listing';
+ import fs from "fs";
+import path from "path";
+import { NextResponse } from "next/server";
+import { ensureDataDir } from "@/lib/data-dir";
+
+const ENTRIES_DIR = ensureDataDir("memory/entries");
+
+type Entry = {
+  id: string;
+  title?: string;
+  text?: string;
+  content?: string;
+  timestamp: number | string;
+};
 
 export async function GET() {
   try {
-    const keys = await listObjects('memory/entries/', '.json');
+    const files = fs.readdirSync(ENTRIES_DIR).filter((f) => f.endsWith(".json"));
 
-    const items: any[] = [];
-    for (const key of keys.slice(-200).reverse()) {
-      try {
-        items.push({ id: key, ...(await getObjectJSON(key)) });
-      } catch {}
-    }
+    const items: Entry[] = files
+      .map((fname) => {
+        const filePath = path.join(ENTRIES_DIR, fname);
+        try {
+          const raw = fs.readFileSync(filePath, "utf8");
+          const parsed = JSON.parse(raw);
 
-    return NextResponse.json({ ok: true, items });
-  } catch (e: any) {
-    console.error('[memory/entries] ERROR', e);
-    return NextResponse.json({ ok: false, error: e?.message || 'Failed' }, { status: 500 });
+          // ✅ add parens when mixing ?? with ||
+          const ts =
+            parsed.timestamp ??
+            (Number(fname.replace(/\D/g, "")) || Date.now());
+
+          const id = parsed.id ?? path.parse(fname).name;
+          const text = parsed.text ?? parsed.content ?? "";
+
+          return {
+            id: String(id),
+            title: parsed.title ?? "",
+            text,
+            timestamp: ts,
+          } as Entry;
+        } catch {
+          return null as any;
+        }
+      })
+      .filter(Boolean);
+
+    items.sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+    return NextResponse.json({ entries: items });
+  } catch (e) {
+    console.error("Error reading memory entries:", e);
+    return NextResponse.json({ entries: [], error: "read_failed" }, { status: 200 });
   }
 }
