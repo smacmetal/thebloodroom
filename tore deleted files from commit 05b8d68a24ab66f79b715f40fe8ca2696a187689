@@ -1,0 +1,373 @@
+[33mcommit 1a3b0d9d422cb41b0aaa04fa2fa36708bf1d9007[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Merge: 2e79fff 9b69a25
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sun Aug 10 10:06:26 2025 -0400
+
+    First full push to GitHub repository — clean and ready
+
+[33mcommit 2e79fff23f5a490d3a0455ffaf862cb966625774[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sun Aug 10 10:04:31 2025 -0400
+
+    First full push to GitHub repository — clean and ready
+
+[33mcommit 9b69a2546f9308bbc6a43cd4f6654dfd844e344c[m
+Author: smacmetal <stephen@sonar.software>
+Date:   Sun Aug 10 09:56:07 2025 -0400
+
+    adding app
+    
+    re-adding app
+
+ data/memory/entries/first-memory.json                 | 12 [32m++++++[m[31m------[m
+ data/vault/archive/messages/001-L.json                | 10 [32m+++++[m[31m-----[m
+ data/vault/archive/messages/2025-08-04T151000.json    |  5 [32m+++++[m
+ data/vault/archive/messages/kings-sample-message.json |  8 [32m++++[m[31m----[m
+ 4 files changed, 20 insertions(+), 15 deletions(-)
+
+[33mcommit 76c3bb66a183399ea628c3aae3f6f0dd7f6e5619[m
+Merge: 9b146ef 05b8d68
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sun Aug 10 09:45:44 2025 -0400
+
+    Merge branch 'main' of https://github.com/smacmetal/thebloodroom
+
+[33mcommit 9b146effbae98459715512074086138afb7f2638[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sun Aug 10 09:40:28 2025 -0400
+
+    Fresh deploy from working local build
+
+ data/vault/archive/messages/2025-08-04T151000.json | 5 [32m+++++[m
+ 1 file changed, 5 insertions(+)
+
+[33mcommit 05b8d68a24ab66f79b715f40fe8ca2696a187689[m
+Author: smacmetal <stephen@sonar.software>
+Date:   Sun Aug 10 09:38:55 2025 -0400
+
+    Delete app directory
+
+ app/(protected)/layout.tsx                      |  11 [31m--[m
+ app/(protected)/page.tsx                        |   4 [31m-[m
+ app/Vault/[id]/.tsx                             |  39 [31m------[m
+ app/Vault/[id]/edit/page.tsx                    |  46 [31m--------[m
+ app/Vault/[id]/page.tsx                         |  29 [31m-----[m
+ app/Vault/_samples/memory-001.json              |   5 [31m-[m
+ app/Vault/_samples/memory-77fb9033.json         |  13 [31m--[m
+ app/Vault/memory-77fb9033.json                  |   5 [31m-[m
+ app/Vault/new/page.tsx                          |  93 [31m---------------[m
+ app/Vault/page.tsx                              |  78 [31m------------[m
+ app/Vault/some-sacred-memory.json               |  11 [31m--[m
+ app/api/_ip/route.ts                            |   7 [31m--[m
+ app/api/delete/page.tsx                         |   0
+ app/api/king/messages/route.ts                  |  34 [31m------[m
+ app/api/king/messages/upload/route.ts           |  21 [31m----[m
+ app/api/king/save/save.ts                       |  33 [31m------[m
+ app/api/lock/logout/route.ts                    |   7 [31m--[m
+ app/api/lock/route.ts                           |  22 [31m----[m
+ app/api/memory/entries/route.ts                 | 110 [31m-----------------[m
+ app/api/princess/messages/route.ts              |  34 [31m------[m
+ app/api/princess/messages/upload/route.ts       |  21 [31m----[m
+ app/api/princess/save/route.ts                  |  36 [31m------[m
+ app/api/queen/messages/route.ts                 |  34 [31m------[m
+ app/api/queen/messages/upload/route.ts          |  21 [31m----[m
+ app/api/queen/save/route.ts                     |  14 [31m---[m
+ app/api/s3/get/route.ts                         |  20 [31m----[m
+ app/api/s3/list/route.ts                        |  19 [31m---[m
+ app/api/shared/files/route.ts                   |  38 [31m------[m
+ app/api/shared/send-multi/route.ts              | 127 [31m--------------------[m
+ app/api/sms/inbound/route.ts                    |  64 [31m----------[m
+ app/api/sms/send/route.ts                       |  54 [31m---------[m
+ app/api/trinity/messages/route.ts               |  13 [31m--[m
+ app/api/trinity/save/route.ts                   |  21 [31m----[m
+ app/api/vault/[id]/route.ts                     |  39 [31m------[m
+ app/api/vault/archive/messages/route.ts         |  50 [31m--------[m
+ app/api/vault/delete/route.ts                   |  58 [31m---------[m
+ app/api/vault/list/route.ts                     |  26 [31m----[m
+ app/api/vault/route.ts                          |  62 [31m----------[m
+ app/api/vault/save/route.ts                     |  14 [31m---[m
+ app/bloodroom/data/data/some-sacred-memory.json |   5 [31m-[m
+ app/bloodroom/data/messages/route.ts            |  41 [31m-------[m
+ app/bloodroom/data/some-sacred-memory.json      |   5 [31m-[m
+ app/bloodroom/some-sacred-memory.json           |   6 [31m-[m
+ app/components/FilterBar.tsx                    |  49 [31m--------[m
+ app/components/MessageInput.tsx                 |  49 [31m--------[m
+ app/components/MessageList.tsx                  |  47 [31m--------[m
+ app/components/MultiRoleMessageForm.tsx         |  90 [31m--------------[m
+ app/components/UploadFile.tsx                   |  48 [31m--------[m
+ app/components/ui/button.tsx                    |  28 [31m-----[m
+ app/favicon.ico                                 | Bin [31m25931[m -> [32m0[m bytes
+ app/globals.css                                 |  26 [31m----[m
+ app/king/messages/route.ts                      |  14 [31m---[m
+ app/king/page.tsx                               | 151 [31m------------------------[m
+ app/layout.tsx                                  |  60 [31m----------[m
+ app/legacy/page.tsx                             |  17 [31m---[m
+ app/lib/sacred.ta.txt                           |   5 [31m-[m
+ app/lock/page.tsx                               |  54 [31m---------[m
+ app/memory/new/page.tsx                         |  95 [31m---------------[m
+ app/memory/page.tsx                             |  59 [31m---------[m
+ app/memoryvault/page.tsx                        |  57 [31m---------[m
+ app/page.tsx                                    |  29 [31m-----[m
+ app/princess/messages/route.ts                  |  14 [31m---[m
+ app/princess/page.tsx                           | 142 [31m----------------------[m
+ app/queen/messages/route.ts                     |  14 [31m---[m
+ app/queen/page.tsx                              | 142 [31m----------------------[m
+ app/royal/New Text Document.txt                 |   0
+ app/s3-browser/page.tsx                         |  72 [31m-----------[m
+ app/trinity/page.tsx                            |  92 [31m---------------[m
+ app/vault/[id]/.tsx                             |  39 [31m------[m
+ app/vault/[id]/edit/page.tsx                    |  46 [31m--------[m
+ app/vault/[id]/page.tsx                         |  29 [31m-----[m
+ app/vault/_samples/memory-001.json              |   5 [31m-[m
+ app/vault/_samples/memory-77fb9033.json         |  13 [31m--[m
+ app/vault/memory-77fb9033.json                  |   5 [31m-[m
+ app/vault/new/page.tsx                          |  93 [31m---------------[m
+ app/vault/page.tsx                              |  78 [31m------------[m
+ app/vault/some-sacred-memory.json               |  11 [31m--[m
+ 77 files changed, 3063 deletions(-)
+
+[33mcommit e5c28386af29c0014d121252a79b5a9b84f563aa[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sun Aug 10 01:53:37 2025 -0400
+
+    Add minimal stub for app/(protected)/page + fix Vault route
+
+ app/(protected)/page.tsx | 56 [32m+++[m[31m---------------------------------------------[m
+ 1 file changed, 3 insertions(+), 53 deletions(-)
+
+[33mcommit 38bc86d7d1fcb063c160f994c80462c6537137e5[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sun Aug 10 01:46:43 2025 -0400
+
+    Fix route case: Vault -> vault
+
+ .gitignore | 2 [32m++[m
+ 1 file changed, 2 insertions(+)
+
+[33mcommit 7974f1337e015b2bc06ab7f263cd0ccb6c675836[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sun Aug 10 01:19:55 2025 -0400
+
+    Local fixes and new files
+
+ app/Vault/page.tsx                 | 75 [32m+++++++++++++++++++++++++++++[m[31m--[m
+ app/api/king/messages/route.ts     | 90 [32m+++++++++++[m[31m---------------------------[m
+ app/api/princess/messages/route.ts | 90 [32m+++++++++++[m[31m---------------------------[m
+ app/api/queen/messages/route.ts    | 90 [32m+++++++++++[m[31m---------------------------[m
+ app/api/s3/get/route.ts            | 20 [32m+++++++++[m
+ app/api/s3/list/route.ts           | 19 [32m++++++++[m
+ app/api/vault/[id]/route.ts        | 19 [32m+++++++[m[31m-[m
+ app/api/vault/route.ts             | 76 [32m+++++++++++++++++++++++[m[31m---------[m
+ app/layout.tsx                     |  7 [32m++[m[31m-[m
+ app/s3-browser/page.tsx            | 72 [32m++++++++++++++++++++++++++++++[m
+ app/vault/page.tsx                 | 75 [32m+++++++++++++++++++++++++++++[m[31m--[m
+ middleware.ts                      | 29 [32m++++++[m[31m------[m
+ 12 files changed, 423 insertions(+), 239 deletions(-)
+
+[33mcommit c3a9750400e67e35bc55088558182e92394acf5a[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sat Aug 9 13:02:30 2025 -0400
+
+    Fix: normalize Vault route (redirects + links -> /vault)
+
+ middleware.ts | 17 [32m++++++++++[m[31m-------[m
+ 1 file changed, 10 insertions(+), 7 deletions(-)
+
+[33mcommit e19cf9c7cddbd1465da7a9c0f483231264aedccd[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sat Aug 9 12:51:02 2025 -0400
+
+    Force fresh deploy: ensure /vault lowercase
+
+ app/Vault/page.tsx                      | 102 [32m++[m[31m------------------------------[m
+ app/vault/[id]/.tsx                     |  39 [32m++++++++++++[m
+ app/vault/[id]/edit/page.tsx            |  46 [32m++++++++++++++[m
+ app/vault/[id]/page.tsx                 |  29 [32m+++++++++[m
+ app/vault/_samples/memory-001.json      |   5 [32m++[m
+ app/vault/_samples/memory-77fb9033.json |  13 [32m++++[m
+ app/vault/memory-77fb9033.json          |   5 [32m++[m
+ app/vault/new/page.tsx                  |  93 [32m+++++++++++++++++++++++++++++[m
+ app/vault/page.tsx                      |   9 [32m+++[m
+ app/vault/some-sacred-memory.json       |  11 [32m++++[m
+ 10 files changed, 255 insertions(+), 97 deletions(-)
+
+[33mcommit 925fcb285cc48048daf291453b942ef753f606c9[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sat Aug 9 12:12:00 2025 -0400
+
+    Lockdown: IP allow-list middleware + /api/_ip helper
+
+ app/api/_ip/route.ts |  7 [32m+++++[m
+ middleware.ts        | 84 [32m+++++++++++++++++++++[m[31m-------------------------------[m
+ 2 files changed, 40 insertions(+), 51 deletions(-)
+
+[33mcommit 761c0681632c83206dcb8ee6a02b024af0c1e0cf[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sat Aug 9 11:49:18 2025 -0400
+
+    lock + allowlist
+
+ lib/s3.ts     | 156 [32m++++++++++++++++++++++++[m[31m----------------------------------[m
+ middleware.ts |  74 [32m++++++++++++++++++++++[m[31m------[m
+ 2 files changed, 124 insertions(+), 106 deletions(-)
+
+[33mcommit 76edbb9de7369c8b024653de3c7c5a3c663b74ca[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sat Aug 9 11:23:21 2025 -0400
+
+    Wire AWS SDK v3 S3 helpers for all message routes
+
+ lib/s3.ts | 132 [32m++++++++++++++++++++++++++++++++++++++++++++[m[31m------------------[m
+ 1 file changed, 94 insertions(+), 38 deletions(-)
+
+[33mcommit 3312b1442060d2c3ecd312395359cca7e6a9a240[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sat Aug 9 10:52:04 2025 -0400
+
+    Whitelist middleware + remove duplicate /api/lock page
+
+ app/api/lock/page.tsx | 38 [31m--------------------------------------[m
+ 1 file changed, 38 deletions(-)
+
+[33mcommit 66ffb46b725368d582bdda7686c20577f1da4b97[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Sat Aug 9 10:50:27 2025 -0400
+
+    Whitelist middleware + remove duplicate /api/lock page
+
+ app/(protected)/layout.tsx   | 11 [32m+++++++++[m
+ app/(protected)/page.tsx     | 54 [32m++++++++++++++++++++++++++++++++++++++++++++[m
+ app/api/lock/logout/route.ts |  7 [32m++++++[m
+ app/api/lock/page.tsx        | 38 [32m+++++++++++++++++++++++++++++++[m
+ app/api/lock/route.ts        | 22 [32m++++++++++++++++++[m
+ app/lock/page.tsx            | 54 [32m++++++++++++++++++++++++++++++++++++++++++++[m
+ middleware.ts                | 27 [32m++++++++++++++++[m[31m------[m
+ 7 files changed, 206 insertions(+), 7 deletions(-)
+
+[33mcommit 77362cb911d15c3baeb8d070497f912dfb7382eb[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Fri Aug 8 23:16:10 2025 -0400
+
+    Test: force-block via middleware
+
+ middleware.ts | 39 [32m+++++[m[31m----------------------------------[m
+ 1 file changed, 5 insertions(+), 34 deletions(-)
+
+[33mcommit b75f5a4a8d52c1f2682a7c4f0dccbaeeb2d292cd[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Fri Aug 8 23:07:21 2025 -0400
+
+    Force basic auth middleware on all routes; allow Twilio inbound
+
+ middleware.ts | 61 [32m+++++++++++++++++++++++++[m[31m----------------------------------[m
+ 1 file changed, 26 insertions(+), 35 deletions(-)
+
+[33mcommit 5d4855d9e8cbde0ca96dd52560280fdefcaa339b[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Fri Aug 8 22:43:45 2025 -0400
+
+    Add basic auth middleware
+
+ middleware.ts | 51 [32m++++++++++++++++++++++++++++++++++[m[31m-----------------[m
+ 1 file changed, 34 insertions(+), 17 deletions(-)
+
+[33mcommit 40c239d5e38a351643261079405ff9fc0f697349[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Fri Aug 8 22:38:11 2025 -0400
+
+    Add basic auth middleware with Twilio inbound allowlist
+
+ middleware.ts | 51 [32m+++++++++++++++++++[m[31m--------------------------------[m
+ 1 file changed, 19 insertions(+), 32 deletions(-)
+
+[33mcommit 52435b21e08e354012e435a83c2fe3398658cfec[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Fri Aug 8 21:58:21 2025 -0400
+
+    Add site-wide Basic Auth middleware; allow Twilio inbound
+
+ middleware.ts | 45 [32m+++++++++++++++++++++++++++++++++++++++++++++[m
+ 1 file changed, 45 insertions(+)
+
+[33mcommit 23c03d3449b8458e4f313885e0dd82447ac4736d[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Fri Aug 8 21:27:26 2025 -0400
+
+    Disable ESLint/TS checks during build to ship prod
+
+ next.config.js | 12 [32m++++++++[m[31m----[m
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+[33mcommit f1da63d7171d7f76befa9473326661c6499da464[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Fri Aug 8 21:19:55 2025 -0400
+
+    Switch message routes to AWS SDK v3 via lib/s3
+
+ app/king/messages/route.ts     | 49 [32m+++++++[m[31m--------------------------[m
+ app/princess/messages/route.ts | 61 [32m++++++[m[31m------------------------------------[m
+ app/queen/messages/route.ts    | 61 [32m++++++[m[31m------------------------------------[m
+ 3 files changed, 25 insertions(+), 146 deletions(-)
+
+[33mcommit 1e866f3abd89fc2310731d149179dcb3122be9a4[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Fri Aug 8 21:04:35 2025 -0400
+
+    Ship SMS outbound + inbound
+
+ deploy.sh | 7 [32m+++++++[m
+ 1 file changed, 7 insertions(+)
+
+[33mcommit 928148e8ff814761b8add574027fd2f62c3f2894[m
+Author: Stephen MacNeil <stephen@example.com>
+Date:   Fri Aug 8 20:52:01 2025 -0400
+
+    Initial Bloodroom deploy
+
+ app/Vault/new/page.tsx                             |  121 [32m+[m[31m-[m
+ app/Vault/page.tsx                                 |  173 [32m+[m[31m-[m
+ app/api/king/messages/route.ts                     |   97 [32m+[m[31m-[m
+ app/api/king/messages/upload/route.ts              |   65 [32m+[m[31m-[m
+ app/api/memories/entries/route.ts                  |   77 [31m-[m
+ app/api/memory/entries/route.ts                    |  114 [32m+[m[31m-[m
+ app/api/princess/messages/route.ts                 |   92 [32m+[m[31m-[m
+ app/api/princess/messages/upload/route.ts          |   60 [32m+[m[31m-[m
+ app/api/queen/messages/route.ts                    |   87 [32m+[m[31m-[m
+ app/api/queen/messages/upload/route.ts             |   15 [32m+[m[31m-[m
+ app/api/shared/files/route.ts                      |   38 [32m+[m
+ app/api/shared/send-multi/route.ts                 |  127 [32m+[m
+ app/api/sms/inbound/route.ts                       |   64 [32m+[m
+ app/api/sms/send/route.ts                          |   54 [32m+[m
+ app/components/FilterBar.tsx                       |   49 [32m+[m
+ app/components/MessageInput.tsx                    |   49 [32m+[m
+ app/components/MessageList.tsx                     |   47 [32m+[m
+ app/components/MultiRoleMessageForm.tsx            |   90 [32m+[m
+ app/components/UploadFile.tsx                      |   48 [32m+[m
+ app/components/VaultForm.tsx                       |  126 [31m-[m
+ app/components/ui/button.tsx                       |   28 [32m+[m
+ app/king/messages/route.ts                         |   45 [32m+[m
+ app/king/page.tsx                                  |  154 [32m+[m[31m-[m
+ app/layout.tsx                                     |   23 [32m+[m[31m-[m
+ app/memory/new/page.tsx                            |    9 [32m+[m[31m-[m
+ app/memory/page.tsx                                |   72 [32m+[m[31m-[m
+ app/princess/messages/route.ts                     |   59 [32m+[m
+ app/princess/page.tsx                              |  161 [32m+[m[31m-[m
+ app/queen/messages/route.ts                        |   59 [32m+[m
+ app/queen/page.tsx                                 |  161 [32m+[m[31m-[m
+ data/king/messages/1754621676713-lvysld.json       |    8 [32m+[m
+ data/memory/entries/first-memory.json              |    1 [31m-[m
+ data/princess/messages/1754616143664-rpuva9.json   |    7 [32m+[m
+ data/princess/messages/1754621116993-nhp5m6.json   |    8 [32m+[m
+ data/queen/messages/1754616143660-onqy6j.json      |    7 [32m+[m
+ data/queen/messages/1754621116993-nhp5m6.json      |    8 [32m+[m
+ data/queen/messages/files/133983430831377313.jpg   |  Bin [31m0[m -> [32m2201701[m bytes
+ ...IMG_1A19C081-0814-41AE-9074-6C7D118145D6 1.JPEG |  Bin [31m0[m -> [32m1970309[m bytes
+ data/vaault/archive/messages/001-L.json            |    5 [31m-[m
+ data/vaault/archive/messages/route.ts              |   48 [31m-[m
+ lib/s3.ts                                          |   55 [32m+[m
+ lib/sendToRoles.ts                                 |   23 [32m+[m
+ next.config.js                                     |    7 [32m+[m
+ next.config.ts                                     |    7 [31m-[m
+ package-lock.json                                  | 3382 [32m++++++++++++++++[m[31m----[m
+ package.json                                       |    6 [32m+[m
+ 46 files changed, 4338 insertions(+), 1598 deletions(-)

@@ -1,0 +1,11 @@
+{
+  "id": "some-sacred-memory",
+  "title": "A Sacred Memory",
+  "author": "Stephen MacNeil",
+  "date": "2025-08-03T21:00:00-04:00",
+  "tags": ["sacred", "eternal", "trinity"],
+  "body": "## This is a test\n\nYour sacred memory is **alive** and well.\n\n- One\n- Eternal\n- Flame",
+  "type": "memory",
+  "source": "manual",
+  "status": "active"
+}

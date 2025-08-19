@@ -1,0 +1,34 @@
+ /* Links */
+.editor-content a {
+  text-decoration: underline;
+  color: #ffd7de;
+}
+
+/* Blockquote */
+.editor-content blockquote {
+  border-left: 3px solid #7e2a33;
+  padding: 0.25rem 0 0.25rem 0.75rem;
+  margin: 0.5rem 0 0.5rem 0.75rem;
+  color: #f3c9cf;
+}
+
+/* Inline code */
+.editor-content code {
+  background: #1a0e12;
+  padding: 0.1rem 0.35rem;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.95em;
+  border: 1px solid #3a1b20;
+}
+
+/* Code block */
+.editor-content pre {
+  background: #12090c;
+  border: 1px solid #3a1b20;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+.editor-content pre code { border: 0; background: transparent; padding: 0; }

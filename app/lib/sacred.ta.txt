@@ -1,0 +1,5 @@
+import { BASE_URL } from '@/lib/config';
+import { MemoryEntry } from '@/types/memory'; // or wherever that interface lives
+
+const res = await fetch(`${BASE_URL}/api/vault/memory-77fb9033`);
+const data: MemoryEntry = await res.json();
