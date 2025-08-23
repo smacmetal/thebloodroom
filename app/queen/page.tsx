@@ -1,4 +1,5 @@
- import Temple from "@/app/components/Temple";
+ // C:\Users\steph\thebloodroom\app\queen\page.tsx
+import Temple from "@/app/components/Temple";
 
 export default function QueenPage() {
   return (

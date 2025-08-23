@@ -5,13 +5,16 @@ import { useRouter } from "next/navigation";
 export default function LogoutButton() {
   const router = useRouter();
 
-  function handleLogout() {
-    // 🩸 Clear session storage, local storage, cookies — customize as needed
+  async function handleLogout() {
     try {
+      // 🩸 Server-side logout (clears cookies/tokens)
+      await fetch("/api/logout", { method: "POST" });
+
+      // Clear client-side session
       localStorage.clear();
       sessionStorage.clear();
-    } catch {
-      // ignore if not available
+    } catch (err) {
+      console.error("Logout error:", err);
     }
 
     // Redirect back to home

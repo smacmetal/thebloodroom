@@ -1,9 +1,9 @@
- // app/layout.tsx
+ 
 import "./globals.css";
 import type { Metadata } from "next";
 import SiteBanner from "./components/SiteBanner";
-import Navbar from '@/components/Navbar';
-;
+import Navbar from "./components/Navbar";
+import { BloodroomProvider } from "@/app/context/BloodroomContext";
 
 export const metadata: Metadata = {
   title: "The Bloodroom",
@@ -18,13 +18,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      {/* pad-top to clear the fixed banner (~100px) */}
       <body className="min-h-screen bg-[#0b0709] text-[#fbe9ed] pt-[112px]">
-        <SiteBanner />
-        <Navbar />
-        <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
+        {/* ✅ wrap everything inside the Provider */}
+        <BloodroomProvider>
+          <SiteBanner />
+          <Navbar />
+          <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
+        </BloodroomProvider>
       </body>
     </html>
   );
 }
-
