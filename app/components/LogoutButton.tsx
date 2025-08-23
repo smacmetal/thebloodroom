@@ -1,24 +1,26 @@
- "use client";
+ // C:\Users\steph\thebloodroom\app\components\LogoutButton.tsx
+"use client";
 
 import { useRouter } from "next/navigation";
 
 export default function LogoutButton() {
   const router = useRouter();
 
-  async function handleLogout() {
+  function handleLogout() {
+    // Clear local/session storage
     try {
-      // 🩸 Server-side logout (clears cookies/tokens)
-      await fetch("/api/logout", { method: "POST" });
-
-      // Clear client-side session
       localStorage.clear();
       sessionStorage.clear();
-    } catch (err) {
-      console.error("Logout error:", err);
+    } catch {
+      // ignore if not available
     }
 
-    // Redirect back to home
-    router.push("/");
+    // Clear auth cookie
+    document.cookie =
+      "br_auth=; Max-Age=0; path=/; SameSite=Lax; secure;";
+
+    // Redirect back to login
+    router.push("/login");
   }
 
   return (

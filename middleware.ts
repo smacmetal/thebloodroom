@@ -1,9 +1,9 @@
- // C:\Users\steph\thebloodroom\middleware.ts
+ // C:\Users\steph\thebloodroom\app\middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * --- SECTION A: Admin/Dev Tools (your existing logic) ---
+ * --- SECTION A: Admin/Dev Tools ---
  * Basic Auth guarding ONLY in production AND when DEV_TOOLS_ENABLED=true.
  */
 const adminProtectedMatchers = [
@@ -64,11 +64,11 @@ function isAuthed(req: NextRequest): boolean {
 function handleAppGuards(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Don't guard the login page itself (avoid loops)
+  // Don’t guard /login itself (avoid redirect loops)
   if (pathname.startsWith("/login")) return NextResponse.next();
 
-  const needsAuth = appProtectedMatchers.some((p) =>
-    pathname === p || pathname.startsWith(p + "/")
+  const needsAuth = appProtectedMatchers.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
   );
   if (!needsAuth) return NextResponse.next();
 
@@ -83,44 +83,6 @@ function handleAppGuards(req: NextRequest) {
  * --- Middleware entrypoint ---
  */
 export function middleware(req: NextRequest) {
-  // 1) Admin/dev guards (same behavior you already had)
+  // 1) Admin/dev guards
   const adminResult = handleAdminGuards(req);
-  if (adminResult instanceof NextResponse && adminResult.redirected) return adminResult;
-  if (adminResult instanceof NextResponse && adminResult.status === 401) return adminResult;
-
-  // 2) App guards for rooms — SKIPPED because IP lockdown is in place
-// const appResult = handleAppGuards(req);
-// if (appResult instanceof NextResponse && appResult.redirected) return appResult;
-// if (appResult instanceof NextResponse && appResult.status !== 200) return appResult;
-
-  return NextResponse.next();
-}
-
-/**
- * Match both your original admin/dev paths and the app-protected rooms.
- */
-export const config = {
-  matcher: [
-    // Admin/dev (existing)
-    "/test/:path*",
-    "/debug/:path*",
-    "/vault/json/:path*",
-    "/messages/monitor/:path*",
-    "/api/stats/:path*",
-    // App rooms (new)
-    "/bloodroom/:path*",
-    "/queen/:path*",
-    "/princess/:path*",
-    "/king/:path*",
-    "/vault/:path*",
-    "/workroom/:path*",
-    // Also match the base paths without trailing segments
-    "/bloodroom",
-    "/queen",
-    "/princess",
-    "/king",
-    "/vault",
-    "/workroom",
-    "/login", // included so /login remains reachable in all cases
-  ],
-};
+  if (adminResult instanceof NextResponse && adminResult.redirected)
