@@ -7,19 +7,9 @@ export default function LogoutButton() {
   const router = useRouter();
 
   function handleLogout() {
-    // Clear local/session storage
-    try {
-      localStorage.clear();
-      sessionStorage.clear();
-    } catch {
-      // ignore if not available
-    }
-
-    // Clear auth cookie
-    document.cookie =
-      "br_auth=; Max-Age=0; path=/; SameSite=Lax; secure;";
-
-    // Redirect back to login
+    // Clear cookie
+    document.cookie = "br_auth=; Max-Age=0; path=/";
+    // Redirect to login
     router.push("/login");
   }
 

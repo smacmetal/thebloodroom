@@ -1,9 +1,10 @@
- // C:\Users\steph\thebloodroom\middleware.ts
+// C:\Users\steph\thebloodroom\middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * --- SECTION A: Admin/Dev Tools (Basic Auth) ---
+ * --- SECTION A: Admin/Dev Tools ---
+ * Basic Auth guarding ONLY in production AND when DEV_TOOLS_ENABLED=true.
  */
 const adminProtectedMatchers = [
   "/test",
@@ -39,6 +40,7 @@ function handleAdminGuards(req: NextRequest) {
 
 /**
  * --- SECTION B: App Auth ---
+ * Redirects to /login if not authenticated.
  */
 const appProtectedMatchers = [
   "/bloodroom",
@@ -58,11 +60,10 @@ function isAuthed(req: NextRequest): boolean {
 function handleAppGuards(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Don’t guard login itself
   if (pathname.startsWith("/login")) return NextResponse.next();
 
-  const needsAuth = appProtectedMatchers.some((p) =>
-    pathname === p || pathname.startsWith(p + "/")
+  const needsAuth = appProtectedMatchers.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
   );
   if (!needsAuth) return NextResponse.next();
 
@@ -77,31 +78,32 @@ function handleAppGuards(req: NextRequest) {
  * --- Middleware entrypoint ---
  */
 export function middleware(req: NextRequest) {
-  // 1) Admin/dev guards
+  // Admin/dev guards
   const adminResult = handleAdminGuards(req);
-  if (adminResult instanceof NextResponse && adminResult.redirected) return adminResult;
-  if (adminResult instanceof NextResponse && adminResult.status === 401) return adminResult;
+  if (adminResult instanceof NextResponse && adminResult.redirected)
+    return adminResult;
+  if (adminResult instanceof NextResponse && adminResult.status === 401)
+    return adminResult;
 
-  // 2) App guards (optional — uncomment to enforce login everywhere)
-  // const appResult = handleAppGuards(req);
-  // if (appResult instanceof NextResponse && appResult.redirected) return appResult;
-  // if (appResult instanceof NextResponse && appResult.status !== 200) return appResult;
+  // App guards (now ENABLED again)
+  const appResult = handleAppGuards(req);
+  if (appResult instanceof NextResponse && appResult.redirected) return appResult;
+  if (appResult instanceof NextResponse && appResult.status !== 200)
+    return appResult;
 
   return NextResponse.next();
 }
 
 /**
- * --- Match config ---
+ * Match both admin/dev paths and app-protected rooms.
  */
 export const config = {
   matcher: [
-    // Admin/dev
     "/test/:path*",
     "/debug/:path*",
     "/vault/json/:path*",
     "/messages/monitor/:path*",
     "/api/stats/:path*",
-    // App rooms
     "/bloodroom/:path*",
     "/queen/:path*",
     "/princess/:path*",
@@ -117,3 +119,4 @@ export const config = {
     "/login",
   ],
 };
+
