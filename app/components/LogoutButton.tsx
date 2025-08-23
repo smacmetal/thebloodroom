@@ -6,10 +6,8 @@ import { useRouter } from "next/navigation";
 export default function LogoutButton() {
   const router = useRouter();
 
-  function handleLogout() {
-    // Clear cookie
-    document.cookie = "br_auth=; Max-Age=0; path=/";
-    // Redirect to login
+  async function handleLogout() {
+    await fetch("/api/logout", { method: "POST" });
     router.push("/login");
   }
 

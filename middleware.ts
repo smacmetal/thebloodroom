@@ -1,4 +1,4 @@
-// C:\Users\steph\thebloodroom\middleware.ts
+ // C:\Users\steph\thebloodroom\middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -39,7 +39,7 @@ function handleAdminGuards(req: NextRequest) {
 }
 
 /**
- * --- SECTION B: App Auth ---
+ * --- SECTION B: App Auth (Bloodroom, Temples, Vault, Workroom) ---
  * Redirects to /login if not authenticated.
  */
 const appProtectedMatchers = [
@@ -60,6 +60,7 @@ function isAuthed(req: NextRequest): boolean {
 function handleAppGuards(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // Don’t guard the login page itself
   if (pathname.startsWith("/login")) return NextResponse.next();
 
   const needsAuth = appProtectedMatchers.some(
@@ -78,45 +79,40 @@ function handleAppGuards(req: NextRequest) {
  * --- Middleware entrypoint ---
  */
 export function middleware(req: NextRequest) {
-  // Admin/dev guards
   const adminResult = handleAdminGuards(req);
-  if (adminResult instanceof NextResponse && adminResult.redirected)
-    return adminResult;
-  if (adminResult instanceof NextResponse && adminResult.status === 401)
-    return adminResult;
+  if (adminResult.status === 401 || adminResult.redirected) return adminResult;
 
-  // App guards (now ENABLED again)
   const appResult = handleAppGuards(req);
-  if (appResult instanceof NextResponse && appResult.redirected) return appResult;
-  if (appResult instanceof NextResponse && appResult.status !== 200)
-    return appResult;
+  if (appResult.status === 401 || appResult.redirected) return appResult;
 
   return NextResponse.next();
 }
 
-/**
- * Match both admin/dev paths and app-protected rooms.
- */
 export const config = {
   matcher: [
+    // Admin/dev
     "/test/:path*",
     "/debug/:path*",
     "/vault/json/:path*",
     "/messages/monitor/:path*",
-    "/api/stats/:path*",
+    "/api/stats",
+
+    // App rooms
     "/bloodroom/:path*",
     "/queen/:path*",
     "/princess/:path*",
     "/king/:path*",
     "/vault/:path*",
     "/workroom/:path*",
+
+    // Base paths
     "/bloodroom",
     "/queen",
     "/princess",
     "/king",
     "/vault",
     "/workroom",
+
     "/login",
   ],
 };
-
