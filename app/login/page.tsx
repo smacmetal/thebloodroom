@@ -1,53 +1,56 @@
  // C:\Users\steph\thebloodroom\app\login\page.tsx
 "use client";
 
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const [password, setPassword] = useState("");
-
-  const nextUrl = params.get("next") || "/bloodroom";
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
 
-    // TODO: Add real auth check if you want
-    if (password === "blood") {
-      document.cookie =
-        "br_auth=ok; path=/; SameSite=Lax; secure; Max-Age=86400"; // 1 day
-      router.push(nextUrl);
-    } else {
-      alert("Wrong password, try again.");
-    }
+    // On success, set cookie (mock for now)
+    document.cookie = "br_auth=ok; path=/";
+
+    // Redirect to ?next= or home
+    const next = params.get("next") || "/";
+    router.push(next);
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0b0709] text-[#fbe9ed]">
-      <form
-        onSubmit={handleLogin}
-        className="bg-[#1a0d0f] border border-red-900 p-6 rounded-lg shadow-lg space-y-4 w-80"
-      >
-        <h1 className="text-2xl font-bold text-center text-red-500">
-          Bloodroom Login
-        </h1>
+    <div className="max-w-md mx-auto mt-20 p-6 bg-[#1a0d0f] rounded-lg border border-rose-800 shadow-lg">
+      <h1 className="text-2xl font-bold text-center text-rose-400 mb-4">
+        Login to The Bloodroom
+      </h1>
+      <form onSubmit={handleLogin} className="space-y-4">
+        <input
+          type="text"
+          placeholder="Username"
+          className="w-full p-2 rounded bg-black/40 border border-rose-700/50 focus:outline-none"
+        />
         <input
           type="password"
-          placeholder="Enter password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-3 py-2 rounded bg-[#0b0709] border border-red-800 text-[#fbe9ed]"
+          placeholder="Password"
+          className="w-full p-2 rounded bg-black/40 border border-rose-700/50 focus:outline-none"
         />
         <button
           type="submit"
-          className="w-full px-3 py-2 rounded bg-red-700 hover:bg-red-800 border border-red-900"
+          className="w-full px-4 py-2 bg-rose-700 text-white rounded-lg hover:bg-rose-800 transition"
         >
           Enter
         </button>
       </form>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="text-center mt-20">Loading login…</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
 
