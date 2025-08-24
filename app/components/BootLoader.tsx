@@ -1,7 +1,7 @@
 'use client';
 import { useEffect } from "react";
 
-export default function BootLoader({ mode = "Braided" as "Evy"|"Lyra"|"Braided" }) {
+export default function BootLoader({ mode = "Braided" as "Kat"|"Lyra"|"Braided" }) {
   useEffect(() => {
     fetch("/api/persona/boot", {
       method: "POST",

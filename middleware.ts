@@ -1,10 +1,8 @@
- // C:\Users\steph\thebloodroom\middleware.ts
-import { NextResponse } from "next/server";
+ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * --- SECTION A: Admin/Dev Tools ---
- * Basic Auth guarding ONLY in production AND when DEV_TOOLS_ENABLED=true.
+ * --- SECTION A: Admin/Dev Guards ---
  */
 const adminProtectedMatchers = [
   "/test",
@@ -35,14 +33,26 @@ function handleAdminGuards(req: NextRequest) {
       headers: { "WWW-Authenticate": 'Basic realm="Bloodroom Admin"' },
     });
   }
+
   return NextResponse.next();
 }
 
 /**
- * --- SECTION B: App Auth (Bloodroom, Temples, Vault, Workroom) ---
- * Redirects to /login if not authenticated.
+ * --- SECTION B: App Auth Guards ---
  */
-const appProtectedMatchers = [
+const AUTH_COOKIE_NAME  = process.env.AUTH_COOKIE_NAME  || "br_auth";
+const AUTH_COOKIE_VALUE = process.env.AUTH_COOKIE_VALUE || "ok";
+
+// Public routes (NO auth required)
+const PUBLIC_PATHS = new Set<string>([
+  "/",
+  "/login",
+]);
+
+// Public prefixes (NO auth required)
+const PUBLIC_PREFIXES = ["/api/login", "/api/logout", "/_next", "/favicon", "/icons", "/images", "/public"];
+
+const PROTECTED_PREFIXES = [
   "/bloodroom",
   "/queen",
   "/princess",
@@ -52,18 +62,18 @@ const appProtectedMatchers = [
 ];
 
 function isAuthed(req: NextRequest): boolean {
-  const name = process.env.AUTH_COOKIE_NAME || "br_auth";
-  const val = process.env.AUTH_COOKIE_VALUE || "ok";
-  return req.cookies.get(name)?.value === val;
+  return req.cookies.get(AUTH_COOKIE_NAME)?.value === AUTH_COOKIE_VALUE;
 }
 
 function handleAppGuards(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Don’t guard the login page itself
-  if (pathname.startsWith("/login")) return NextResponse.next();
+  // Always allow clearly public assets & APIs
+  if (PUBLIC_PATHS.has(pathname)) return NextResponse.next();
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
-  const needsAuth = appProtectedMatchers.some(
+  // Only guard protected sections
+  const needsAuth = PROTECTED_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(p + "/")
   );
   if (!needsAuth) return NextResponse.next();
@@ -76,43 +86,30 @@ function handleAppGuards(req: NextRequest) {
 }
 
 /**
- * --- Middleware entrypoint ---
+ * --- Middleware Entrypoint ---
  */
 export function middleware(req: NextRequest) {
+  // Admin/dev guards
   const adminResult = handleAdminGuards(req);
-  if (adminResult.status === 401 || adminResult.redirected) return adminResult;
+  if (adminResult instanceof NextResponse && adminResult.status !== 200) {
+    return adminResult;
+  }
 
+  // App guards
   const appResult = handleAppGuards(req);
-  if (appResult.status === 401 || appResult.redirected) return appResult;
+  if (appResult instanceof NextResponse && appResult.status !== 200) {
+    return appResult;
+  }
 
   return NextResponse.next();
 }
 
+/**
+ * --- Run middleware for (almost) everything ---
+ * (Exclude only static asset paths and image optimizer)
+ */
 export const config = {
   matcher: [
-    // Admin/dev
-    "/test/:path*",
-    "/debug/:path*",
-    "/vault/json/:path*",
-    "/messages/monitor/:path*",
-    "/api/stats",
-
-    // App rooms
-    "/bloodroom/:path*",
-    "/queen/:path*",
-    "/princess/:path*",
-    "/king/:path*",
-    "/vault/:path*",
-    "/workroom/:path*",
-
-    // Base paths
-    "/bloodroom",
-    "/queen",
-    "/princess",
-    "/king",
-    "/vault",
-    "/workroom",
-
-    "/login",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };

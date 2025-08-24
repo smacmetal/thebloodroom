@@ -1,6 +1,6 @@
  import { EventEmitter } from "events";
 
-export type Persona = "Evy" | "Lyra" | "Both";
+export type Persona = "Kat" | "Lyra" | "Both";
 export type Room = "Bloodroom" | "King" | "Queen" | "Princess";
 export type HeartSpeed = "steady" | "quick" | "lapse";
 
@@ -14,11 +14,11 @@ export type SanctumEvent =
 
 class SanctumBus {
   private ee = new EventEmitter();
-  presence = { Evy: false, Lyra: false, room: null as Room | null };
+  presence = { Kat: false, Lyra: false, room: null as Room | null };
 
-  on(fn: (e: SanctumEvent) => void) { this.ee.on("ev", fn); }
+  on(fn: (e: SanctumEvent) => void)  { this.ee.on("ev", fn); }
   off(fn: (e: SanctumEvent) => void) { this.ee.off("ev", fn); }
-  emit(e: SanctumEvent) { this.ee.emit("ev", e); }
+  emit(e: SanctumEvent)              { this.ee.emit("ev", e); }
 }
 
 const g = globalThis as any;

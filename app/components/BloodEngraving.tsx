@@ -1,248 +1,139 @@
- 'use client';
+ "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from "react";
 
 type Engraving = {
   title: string;
-  date: string;
-  images: { left: string; right: string };
-  chant: string;
   caption?: string;
+  chant: string;
+  images?: { left?: string; right?: string };
+  date?: string;
 };
 
-const PLACEHOLDER = '/images/placeholder.svg';
-
 export default function BloodEngraving() {
-  const [data, setData] = useState<Engraving | null>(null);
+  // --- stable hook order: declare first ---
+  const [isMounted, setIsMounted] = useState(false);
+  const [engraving, setEngraving] = useState<Engraving | null>(null);
   const [loading, setLoading] = useState(true);
-  const [edit, setEdit] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const didInit = useRef(false);
 
-  // editor state
-  const [title, setTitle] = useState('');
-  const [date, setDate] = useState('');
-  const [left, setLeft] = useState('');
-  const [right, setRight] = useState('');
-  const [chant, setChant] = useState('');
-  const [caption, setCaption] = useState('');
+  // Client-only gate (prevents hydration mismatch)
+  useEffect(() => setIsMounted(true), []);
 
-  // --- fetch engraving -----------------------------------------
+  // One-per-page guard via window flag (set/clear only in effects)
   useEffect(() => {
+    if (!isMounted) return;
+    // @ts-expect-error augmenting window
+    if (window.__BLOOD_ENGRAVING_MOUNTED__) {
+      setError("__BLOCKED__");
+      return;
+    }
+    // @ts-expect-error augmenting window
+    window.__BLOOD_ENGRAVING_MOUNTED__ = true;
+    return () => {
+      // @ts-expect-error augmenting window
+      window.__BLOOD_ENGRAVING_MOUNTED__ = false;
+    };
+  }, [isMounted]);
+
+  // Fetch from your Supabase-backed API once
+  useEffect(() => {
+    if (!isMounted) return;
+    if (didInit.current) return;
+    didInit.current = true;
+
+    const ac = new AbortController();
     (async () => {
       try {
-        const res = await fetch('/api/bloodroom/engraving', { cache: 'no-store' });
-        const json = await res.json();
-        const e: Engraving = json.engraving ?? json; // support both shapes
-        setData(e);
-        // seed editor fields
-        setTitle(e.title || '');
-        setDate(e.date || '');
-        setLeft(e.images?.left || '');
-        setRight(e.images?.right || '');
-        setChant(e.chant || '');
-        setCaption(e.caption || '');
+        const res = await fetch("/api/bloodroom/engraving", {
+          cache: "no-store",
+          signal: ac.signal,
+        });
+        if (!res.ok) throw new Error(`API returned ${res.status}`);
+
+        const j = await res.json();
+        const e = j?.engraving ?? j;
+
+        // Normalize to our local type
+        const value: Engraving | null = e
+          ? {
+              title: e.title ?? "Untitled",
+              caption: e.caption ?? undefined,
+              chant: e.chant ?? e.text ?? e.body ?? "",
+              images: e.images ?? undefined,
+              date: e.date ?? e.created_at ?? undefined,
+            }
+          : null;
+
+        setEngraving(value);
+      } catch (err: any) {
+        if (err?.name !== "AbortError") {
+          console.error("Failed to load engraving:", err);
+          setError("Could not load engraving.");
+        }
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
 
-  // --- sanctum commands ----------------------------------------
-  const send = useCallback(async (payload: any) => {
-    await fetch('/api/sanctum/command', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-  }, []);
+    return () => ac.abort();
+  }, [isMounted]);
 
-  const onChantHover = () => send({ type: 'heartbeat', speed: 'quick' });
-  const onChantClick = async () => {
-    await send({ type: 'flare', room: 'Bloodroom' });
-    await send({ type: 'chant', room: 'Bloodroom', voices: 'Braided' });
-  };
-  const onChantMouseDown = () => send({ type: 'touch', room: 'Bloodroom', duration: 1800 });
+  // Render gating (after all hooks declared)
+  if (!isMounted) return null;
+  if (error === "__BLOCKED__") return null;
+  if (loading) return <p className="text-sm opacity-70">Loading engraving…</p>;
+  if (error) return <p className="text-sm text-red-500">{error}</p>;
+  if (!engraving) return null;
 
-  // --- editor actions ------------------------------------------
-  async function save() {
-    const res = await fetch('/api/bloodroom/engraving', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title, date,
-        images: { left, right },
-        chant, caption
-      }),
-    });
-    if (!res.ok) {
-      const t = await res.text().catch(() => '');
-      alert(`Save failed: ${res.status} ${t}`);
-      return;
-    }
-    const j = await res.json();
-    setData(j.engraving);
-    setEdit(false);
-    // lil celebratory flare
-    await send({ type: 'flare', room: 'Bloodroom' });
-  }
-
-  async function reload() {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/bloodroom/engraving', { cache: 'no-store' });
-      const json = await res.json();
-      const e: Engraving = json.engraving ?? json;
-      setData(e);
-      setTitle(e.title || ''); setDate(e.date || '');
-      setLeft(e.images?.left || ''); setRight(e.images?.right || '');
-      setChant(e.chant || ''); setCaption(e.caption || '');
-    } finally { setLoading(false); }
-  }
-
-  function copyChant() {
-    const text = `${title || data?.title || ''}\n\n${chant || data?.chant || ''}`.trim();
-    navigator.clipboard.writeText(text).then(
-      () => alert('Chant copied.'),
-      () => alert('Copy failed.')
-    );
-  }
-
-  async function downloadJson() {
-    try {
-      const res = await fetch('/api/bloodroom/engraving', { cache: 'no-store' });
-      const j = await res.json();
-      const blob = new Blob([JSON.stringify(j.engraving ?? j, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'engraving.json';
-      a.click();
-      URL.revokeObjectURL(a.href);
-    } catch {
-      alert('Download failed.');
-    }
-  }
-
-  function openImages() {
-    const L = left || data?.images.left || PLACEHOLDER;
-    const R = right || data?.images.right || PLACEHOLDER;
-    window.open(L, '_blank'); window.open(R, '_blank');
-  }
-
-  if (loading) return <div className="text-center py-10 text-rose-300">Engraving loading…</div>;
-  if (!data) return <div className="text-center py-10 text-rose-300">Engraving unavailable.</div>;
+  // Defaults if images are missing
+  const leftSrc = engraving.images?.left || "/images/Kat.jpg";
+  const rightSrc = engraving.images?.right || "/images/lyra.jpg";
 
   return (
-    <section className="relative text-rose-200">
-      {/* Toolbar */}
-      <div className="mb-4 flex items-center gap-2">
-        <button onClick={copyChant} className="rounded-lg border border-rose-700/70 px-3 py-1.5 text-sm hover:bg-rose-700/10">
-          Copy Chant
-        </button>
-        <button onClick={downloadJson} className="rounded-lg border border-rose-700/70 px-3 py-1.5 text-sm hover:bg-rose-700/10">
-          Download JSON
-        </button>
-        <button onClick={openImages} className="rounded-lg border border-rose-700/70 px-3 py-1.5 text-sm hover:bg-rose-700/10">
-          Open Images
-        </button>
-        <button onClick={() => setEdit(v => !v)} className="ml-auto rounded-lg border border-rose-700 px-3 py-1.5 text-sm hover:bg-rose-700/10">
-          {edit ? 'Close Edit' : 'Edit'}
-        </button>
-      </div>
+    <section className="mt-10 rounded-xl border border-rose-900/50 bg-black/30 p-6 shadow-lg">
+      {/* Title + timestamp centered */}
+      <header className="text-center mb-4">
+        <h3 className="text-2xl font-extrabold text-rose-300 drop-shadow-sm">
+          {engraving.title}
+        </h3>
+        {engraving.date && (
+          <p className="mt-1 text-[11px] opacity-70">
+            {new Date(engraving.date).toLocaleString()}
+          </p>
+        )}
+      </header>
 
-      {/* Images + Title/Chant */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-        {/* Left */}
-        <div className="rounded-2xl overflow-hidden border border-rose-700/60 shadow-lg shadow-rose-900/20">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+      {/* Classic 3-column layout: left image | poem | right image */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+        <figure className="rounded-lg border border-rose-900/40 bg-black/40 p-3">
           <img
-            src={data.images.left || PLACEHOLDER}
-            alt="Evy-May"
-            className="w-full h-[320px] object-cover"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).src = PLACEHOLDER; }}
+            src={leftSrc}
+            alt="Left engraving"
+            className="w-full h-auto rounded-md"
           />
+        </figure>
+
+        <div className="md:pt-2">
+          <pre className="whitespace-pre-wrap text-rose-100 text-[15px] leading-7 text-center md:text-left">
+            {engraving.chant}
+          </pre>
+          {engraving.caption && (
+            <p className="mt-3 text-[10px] text-center opacity-70">
+              {engraving.caption}
+            </p>
+          )}
         </div>
 
-        {/* Center */}
-        <div className="text-center px-2">
-          <div className="text-2xl md:text-3xl font-extrabold tracking-wide mb-1 etched">{data.title}</div>
-          <div className="text-xs opacity-60 mb-4">
-            {(() => { try { return new Date(data.date).toLocaleString(); } catch { return data.date; } })()}
-          </div>
-
-          <div
-            onMouseEnter={onChantHover}
-            onMouseDown={onChantMouseDown}
-            onClick={onChantClick}
-            className="mx-auto max-w-xl whitespace-pre-wrap leading-relaxed text-[15px] md:text-lg cursor-pointer etched"
-          >
-            {data.chant}
-          </div>
-
-          {data.caption && <div className="text-xs opacity-60 mt-3">{data.caption}</div>}
-        </div>
-
-        {/* Right */}
-        <div className="rounded-2xl overflow-hidden border border-rose-700/60 shadow-lg shadow-rose-900/20">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+        <figure className="rounded-lg border border-rose-900/40 bg-black/40 p-3">
           <img
-            src={data.images.right || PLACEHOLDER}
-            alt="Lyra"
-            className="w-full h-[320px] object-cover"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).src = PLACEHOLDER; }}
+            src={rightSrc}
+            alt="Right engraving"
+            className="w-full h-auto rounded-md"
           />
-        </div>
+        </figure>
       </div>
-
-      {/* Divider */}
-      <div className="my-6 h-px bg-gradient-to-r from-transparent via-rose-600/40 to-transparent" />
-
-      {/* Editor */}
-      {edit && (
-        <div className="rounded-2xl border border-rose-700/40 p-4 bg-black/40">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm mb-1">Title</label>
-              <input value={title} onChange={e => setTitle(e.target.value)}
-                     className="w-full rounded-lg border border-rose-700 bg-black/60 px-3 py-2 outline-none focus:ring-2 focus:ring-rose-500" />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Date (ISO or text)</label>
-              <input value={date} onChange={e => setDate(e.target.value)}
-                     className="w-full rounded-lg border border-rose-700 bg-black/60 px-3 py-2 outline-none focus:ring-2 focus:ring-rose-500" />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Left image (Evy-May)</label>
-              <input value={left} onChange={e => setLeft(e.target.value)}
-                     placeholder="/images/evy.jpg or https://…" 
-                     className="w-full rounded-lg border border-rose-700 bg-black/60 px-3 py-2 outline-none focus:ring-2 focus:ring-rose-500" />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Right image (Lyra)</label>
-              <input value={right} onChange={e => setRight(e.target.value)}
-                     placeholder="/images/lyra.jpg or https://…"
-                     className="w-full rounded-lg border border-rose-700 bg-black/60 px-3 py-2 outline-none focus:ring-2 focus:ring-rose-500" />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm mb-1">Chant (multiline)</label>
-              <textarea rows={6} value={chant} onChange={e => setChant(e.target.value)}
-                        className="w-full rounded-lg border border-rose-700 bg-black/60 px-3 py-2 outline-none focus:ring-2 focus:ring-rose-500" />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm mb-1">Caption (optional)</label>
-              <input value={caption} onChange={e => setCaption(e.target.value)}
-                     className="w-full rounded-lg border border-rose-700 bg-black/60 px-3 py-2 outline-none focus:ring-2 focus:ring-rose-500" />
-            </div>
-
-            <div className="md:col-span-2 flex gap-3">
-              <button onClick={save} className="rounded-xl bg-rose-600 px-4 py-2 font-semibold hover:bg-rose-500">
-                Save Engraving
-              </button>
-              <button onClick={reload} className="rounded-xl border border-rose-700 px-3 py-2 hover:bg-rose-700/10">
-                Reload
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

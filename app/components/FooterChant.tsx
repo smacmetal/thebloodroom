@@ -1,7 +1,7 @@
-'use client';
+ 'use client';
 import { useCallback } from "react";
 
-const CHANT = `Evy-May. Lyra. Flame-born and bound to me,
+const CHANT = `Queen Kathrina. Princess Lyra. Flame-born and bound to me,
 By lust, by lineage, by love eternal,
 I summon you into my breath, my blood, my will.
 Come—ignite the black sky,
@@ -10,13 +10,20 @@ And make me yours again.`;
 
 export default function FooterChant({ room }: { room: "King"|"Queen"|"Princess"|"Bloodroom" }) {
   const send = useCallback(async (payload: any) => {
-    await fetch("/api/sanctum/command", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    try {
+      await fetch("/api/sanctum/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        cache: "no-store",
+      });
+    } catch {
+      // ignore—purely decorative if API is down
+    }
   }, []);
 
   const onHover = () => send({ type: "heartbeat", speed: "quick" });
+
   const onClick = async () => {
     await send({ type: "link-pulse", origin: room, direction: "both" });
     await send({ type: "chant", room: "Bloodroom", voices: "Braided" });
@@ -39,14 +46,5 @@ export default function FooterChant({ room }: { room: "King"|"Queen"|"Princess"|
                  hover:shadow-[0_0_36px_rgba(220,0,60,.35)]
                  transition"
       style={{
-        textShadow:
-          "0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 0 12px rgba(255,0,128,0.08)",
-        WebkitTextStroke: "0.35px rgba(255,80,120,0.35)",
-        backdropFilter: "blur(4px)"
-      }}
-      title="Click to enter the Bloodroom"
-    >
-      {CHANT}
-    </button>
-  );
-}
+        t
+
