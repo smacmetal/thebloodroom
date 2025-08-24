@@ -1,24 +1,79 @@
-export default function DebugConsole() {
-  const isProd = process.env.NODE_ENV === 'production';
-  if (isProd) return <div className="p-6">🔒 Debug Console hidden in production.</div>;
+"use client";
 
-  const envSafe = {
-    NODE_ENV: process.env.NODE_ENV,
-    AWS_REGION: process.env.AWS_REGION,
-    S3_BUCKET: process.env.S3_BUCKET || process.env.S3_BUCKET_NAME,
-    // keys masked on purpose
-    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ? '***' : '',
-    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY ? '***' : '',
-  };
+import { useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
+
+function DebugLoginInner() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const router = useRouter();
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await fetch("/api/login-debug", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    if (res.ok) {
+      router.push("/debug/tools"); // 👈 after login, send into debug space
+    } else {
+      alert("Debug login failed — admin credentials only.");
+    }
+  }
 
   return (
-    <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold">🛠️ Debug Console</h1>
-      <div className="text-sm opacity-80">
-        <div className="font-semibold">Environment (safe view):</div>
-        <pre className="bg-black/10 p-3 rounded">{JSON.stringify(envSafe, null, 2)}</pre>
-      </div>
-      <p className="text-sm opacity-80">Add more diagnostics here as needed.</p>
-    </div>
+    <main className="flex min-h-screen items-center justify-center bg-[#0b0709] text-[#fbe9ed]">
+      <form
+        onSubmit={handleLogin}
+        className="bg-[#170c0f] p-8 rounded-xl shadow-lg border border-rose-800/60 w-full max-w-sm"
+      >
+        <p className="text-sm tracking-wide text-red-500 text-center mb-2">
+          Debug Sanctum
+        </p>
+        <h1 className="text-2xl font-bold text-center mb-6">
+          Enter Debug Sanctum
+        </h1>
+
+        <div className="mb-4">
+          <label className="block mb-1">Admin Username</label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="w-full px-3 py-2 rounded bg-black/40 border border-rose-700/60 focus:outline-none focus:ring focus:ring-rose-600"
+            autoComplete="username"
+            required
+          />
+        </div>
+
+        <div className="mb-6">
+          <label className="block mb-1">Admin Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full px-3 py-2 rounded bg-black/40 border border-rose-700/60 focus:outline-none focus:ring focus:ring-rose-600"
+            autoComplete="current-password"
+            required
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="w-full py-2 rounded-lg bg-rose-700 text-white font-semibold hover:bg-rose-800 transition"
+        >
+          Login as Admin
+        </button>
+      </form>
+    </main>
+  );
+}
+
+export default function DebugLoginPage() {
+  return (
+    <Suspense fallback={<div className="text-center mt-20">Loading...</div>}>
+      <DebugLoginInner />
+    </Suspense>
   );
 }
