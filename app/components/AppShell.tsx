@@ -4,6 +4,9 @@
 import { usePathname } from "next/navigation";
 import SiteBanner from "./SiteBanner";
 import Navbar from "./Navbar";
+import SanctumChannel from "@/app/components/SanctumChannel";
+// …
+<SanctumChannel />
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
