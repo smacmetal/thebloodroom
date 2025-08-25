@@ -40,17 +40,22 @@ function handleAdminGuards(req: NextRequest) {
 /**
  * --- SECTION B: App Auth Guards ---
  */
-const AUTH_COOKIE_NAME  = process.env.AUTH_COOKIE_NAME  || "br_auth";
+const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "br_auth";
 const AUTH_COOKIE_VALUE = process.env.AUTH_COOKIE_VALUE || "ok";
 
 // Public routes (NO auth required)
-const PUBLIC_PATHS = new Set<string>([
-  "/",
-  "/login",
-]);
+const PUBLIC_PATHS = new Set<string>(["/", "/login"]);
 
 // Public prefixes (NO auth required)
-const PUBLIC_PREFIXES = ["/api/login", "/api/logout", "/_next", "/favicon", "/icons", "/images", "/public"];
+const PUBLIC_PREFIXES = [
+  "/api/login",
+  "/api/logout",
+  "/_next",
+  "/favicon",
+  "/icons",
+  "/images",
+  "/public",
+];
 
 const PROTECTED_PREFIXES = [
   "/bloodroom",
@@ -68,11 +73,10 @@ function isAuthed(req: NextRequest): boolean {
 function handleAppGuards(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Always allow clearly public assets & APIs
   if (PUBLIC_PATHS.has(pathname)) return NextResponse.next();
-  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p)))
+    return NextResponse.next();
 
-  // Only guard protected sections
   const needsAuth = PROTECTED_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(p + "/")
   );
@@ -89,27 +93,18 @@ function handleAppGuards(req: NextRequest) {
  * --- Middleware Entrypoint ---
  */
 export function middleware(req: NextRequest) {
-  // Admin/dev guards
   const adminResult = handleAdminGuards(req);
-  if (adminResult instanceof NextResponse && adminResult.status !== 200) {
-    return adminResult;
-  }
+  if (adminResult.status !== 200) return adminResult;
 
-  // App guards
   const appResult = handleAppGuards(req);
-  if (appResult instanceof NextResponse && appResult.status !== 200) {
-    return appResult;
-  }
+  if (appResult.status !== 200) return appResult;
 
   return NextResponse.next();
 }
 
 /**
  * --- Run middleware for (almost) everything ---
- * (Exclude only static asset paths and image optimizer)
  */
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
