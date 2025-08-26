@@ -1,7 +1,10 @@
- // C:\Users\steph\thebloodroom\app\king\page.tsx
+// C:\Users\steph\thebloodroom\app\princess\page.tsx
 import Temple from "@/app/components/Temple";
 
-export default function KingPage() {
+// 👇 tell Next.js this page should always be served at runtime
+export const dynamic = "force-dynamic";
+
+export default function PrincessPage() {
   return (
     <Temple
       chamberLabel="King"
