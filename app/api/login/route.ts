@@ -1,7 +1,10 @@
- // app/api/login/route.ts
+export const runtime = "nodejs"; // force Node runtime
+
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/app/lib/supabaseClient";
 import bcrypt from "bcryptjs";
+
+// ...rest of your login route unchanged
 
 const COOKIE_NAME   = process.env.AUTH_COOKIE_NAME  || "br_auth";
 const COOKIE_VALUE  = process.env.AUTH_COOKIE_VALUE || "ok";
@@ -20,16 +23,6 @@ export async function POST(req: NextRequest) {
       username = String(json?.username ?? "").toLowerCase();
       password = String(json?.password ?? "");
       remember = Boolean(json?.remember ?? false);
-    } catch {}
-  }
-
-  // Parse FormData fallback
-  if ((!username || !password) && (ct.includes("application/x-www-form-urlencoded") || ct.includes("multipart/form-data"))) {
-    try {
-      const form = await req.formData();
-      username = String(form.get("username") ?? "").toLowerCase();
-      password = String(form.get("password") ?? "");
-      remember = String(form.get("remember") ?? "") === "on";
     } catch {}
   }
 
@@ -71,14 +64,17 @@ export async function POST(req: NextRequest) {
 
   const userCookie = {
     name: "br_user",
-    value: user.username,
+    value: user.role, // 👈 store role directly (king/queen/princess)
     ...baseCookie,
     ...(remember ? { maxAge: REMEMBER_MAX_AGE } : {}),
   };
 
-  const res = ct.includes("application/json")
-    ? NextResponse.json({ ok: true, user: { id: user.id, username: user.username, role: user.role } })
-    : NextResponse.redirect(new URL("/", req.url));
+  // Set cookies
+  const res = NextResponse.json({
+    ok: true,
+    redirect: `/${user.role}`, // 👈 tell client where to go
+    user: { id: user.id, username: user.username, role: user.role },
+  });
 
   res.cookies.set(authCookie);
   res.cookies.set(userCookie);

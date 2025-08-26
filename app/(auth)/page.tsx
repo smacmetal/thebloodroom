@@ -1,30 +1,42 @@
+ // C:\Users\steph\thebloodroom\app\(auth)\page.tsx
+
+export const dynamic = "force-dynamic"; // disable prerender
+
 "use client";
 
 import { useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
 
+// ...rest of your login page
+
 function LoginInner() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
+
     try {
       const res = await fetch("/api/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" }, // 🔒 always JSON
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password, remember }),
       });
-      if (res.ok) {
-        router.push("/"); // back to home (or we can use ?next=… param later)
+
+      const data = await res.json();
+
+      if (res.ok && data?.redirect) {
+        router.push(data.redirect); // 🌟 go where API tells us
       } else {
-        alert("Login failed — check your credentials.");
+        setError(data?.error || "Login failed — check your credentials.");
       }
     } catch (err) {
       console.error("Login error:", err);
-      alert("Unexpected error — try again.");
+      setError("Unexpected error — try again.");
     }
   }
 
@@ -37,7 +49,13 @@ function LoginInner() {
         <p className="text-sm tracking-wide text-red-500 text-center mb-2">
           Welcome to The Bloodroom
         </p>
-        <h1 className="text-2xl font-bold text-center mb-6">Enter The Bloodroom</h1>
+        <h1 className="text-2xl font-bold text-center mb-6">
+          Enter The Bloodroom
+        </h1>
+
+        {error && (
+          <div className="mb-4 text-red-400 text-sm text-center">{error}</div>
+        )}
 
         <div className="mb-4">
           <label className="block mb-1">Username</label>
@@ -91,3 +109,4 @@ export default function LoginPage() {
     </Suspense>
   );
 }
+

@@ -5,13 +5,11 @@ import { usePathname } from "next/navigation";
 import SiteBanner from "./SiteBanner";
 import Navbar from "./Navbar";
 import SanctumChannel from "@/app/components/SanctumChannel";
-// …
-<SanctumChannel />
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Show full chrome everywhere except public surfaces (login, add more if needed)
+  // Hide chrome for login or other public pages
   const showChrome = !pathname.startsWith("/login");
 
   return (
@@ -20,9 +18,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <>
           <SiteBanner />
           <Navbar />
+          <SanctumChannel />  {/* 👈 lives with the other top-level chrome */}
         </>
       )}
-      {/* Apply the top padding only when the chrome is visible */}
+
+      {/* Main content wrapper */}
       <main className={`max-w-6xl mx-auto px-4 py-6 ${showChrome ? "pt-[112px]" : ""}`}>
         {children}
       </main>

@@ -1,4 +1,7 @@
  // app/api/temple/submit/route.ts
+ export const runtime = "nodejs"; // force Node runtime
+
+// ...the rest of your temple submit handler
 import { promises as fs } from "fs";
 import path from "path";
 import twilio from "twilio";
