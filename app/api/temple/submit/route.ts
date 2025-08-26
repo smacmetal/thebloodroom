@@ -1,13 +1,10 @@
  // app/api/temple/submit/route.ts
- export const runtime = "nodejs"; // force Node runtime
+export const runtime = "nodejs"; // ✅ keep only once
 
-// ...the rest of your temple submit handler
 import { promises as fs } from "fs";
 import path from "path";
 import twilio from "twilio";
 import { supabase } from "@/lib/supabaseClient";
-
-export const runtime = "nodejs";
 
 type ChamberKey = "king" | "queen" | "princess";
 type ChamberLabel = "King" | "Queen" | "Princess";
@@ -115,7 +112,7 @@ export async function POST(req: Request) {
       await fs.writeFile(path.join(recipDir, `${id}.json`), JSON.stringify(copy, null, 2), "utf-8");
     }
 
-    // NEW: Insert into Supabase "messages" table
+    // Insert into Supabase "messages" table
     const { error } = await supabase.from("messages").insert([
       {
         uid: id,
