@@ -1,67 +1,87 @@
- import { NextRequest, NextResponse } from "next/server";
+ // app/api/login/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { supabase } from "@/lib/supabaseClient";
+import bcrypt from "bcryptjs";
 
-const COOKIE_NAME  = process.env.AUTH_COOKIE_NAME  || "br_auth";
-const COOKIE_VALUE = process.env.AUTH_COOKIE_VALUE || "ok";
-// Optional: configure remember-me duration (seconds). Default 14 days.
-const REMEMBER_MAX_AGE =
-  Number(process.env.AUTH_REMEMBER_MAX_AGE_SEC || 60 * 60 * 24 * 14);
+const COOKIE_NAME   = process.env.AUTH_COOKIE_NAME  || "br_auth";
+const COOKIE_VALUE  = process.env.AUTH_COOKIE_VALUE || "ok";
+const REMEMBER_MAX_AGE = Number(process.env.AUTH_REMEMBER_MAX_AGE_SEC || 60 * 60 * 24 * 14);
 
 export async function POST(req: NextRequest) {
   const ct = req.headers.get("content-type") || "";
-
   let username = "";
   let password = "";
   let remember = false;
 
-  // Form-encoded
-  if (ct.includes("application/x-www-form-urlencoded") || ct.includes("multipart/form-data")) {
-    try {
-      const form = await req.formData();
-      username = String(form.get("username") ?? "");
-      password = String(form.get("password") ?? "");
-      remember = String(form.get("remember") ?? "") === "on";
-    } catch {}
-  }
-
-  // JSON
-  if (!username && !password && ct.includes("application/json")) {
+  // Parse JSON
+  if (ct.includes("application/json")) {
     try {
       const json = await req.json();
-      username = String(json?.username ?? "");
+      username = String(json?.username ?? "").toLowerCase();
       password = String(json?.password ?? "");
       remember = Boolean(json?.remember ?? false);
     } catch {}
   }
 
-  // TODO: replace with real auth check
-  const valid = username.length > 0 && password.length > 0;
-  if (!valid) {
-    if (ct.includes("application/json")) {
-      return NextResponse.json({ ok: false }, { status: 401 });
-    }
-    return NextResponse.redirect(new URL("/login?error=1", req.url));
+  // Parse FormData fallback
+  if ((!username || !password) && (ct.includes("application/x-www-form-urlencoded") || ct.includes("multipart/form-data"))) {
+    try {
+      const form = await req.formData();
+      username = String(form.get("username") ?? "").toLowerCase();
+      password = String(form.get("password") ?? "");
+      remember = String(form.get("remember") ?? "") === "on";
+    } catch {}
   }
 
-  // Build cookie options
+  if (!username || !password) {
+    return NextResponse.json({ ok: false, error: "Missing credentials" }, { status: 400 });
+  }
+
+  // 🔑 Fetch user from Supabase
+  const { data: user, error } = await supabase
+    .from("users")
+    .select("id, username, password, role")
+    .eq("username", username)
+    .single();
+
+  if (error || !user) {
+    return NextResponse.json({ ok: false, error: "User not found" }, { status: 401 });
+  }
+
+  // 🔐 Compare password (plain vs hash)
+  const valid = await bcrypt.compare(password, user.password);
+  if (!valid) {
+    return NextResponse.json({ ok: false, error: "Invalid password" }, { status: 401 });
+  }
+
+  // 🍪 Cookies
   const baseCookie = {
-    name: COOKIE_NAME,
-    value: COOKIE_VALUE, // must match middleware expectation
     path: "/",
     httpOnly: true,
     sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
   };
 
-  // Session cookie (no maxAge) vs persistent
+  const authCookie = {
+    name: COOKIE_NAME,
+    value: COOKIE_VALUE,
+    ...baseCookie,
+    ...(remember ? { maxAge: REMEMBER_MAX_AGE } : {}),
+  };
+
+  const userCookie = {
+    name: "br_user",
+    value: user.username,
+    ...baseCookie,
+    ...(remember ? { maxAge: REMEMBER_MAX_AGE } : {}),
+  };
+
   const res = ct.includes("application/json")
-    ? NextResponse.json({ ok: true })
+    ? NextResponse.json({ ok: true, user: { id: user.id, username: user.username, role: user.role } })
     : NextResponse.redirect(new URL("/", req.url));
 
-  if (remember) {
-    res.cookies.set({ ...baseCookie, maxAge: REMEMBER_MAX_AGE });
-  } else {
-    res.cookies.set(baseCookie); // session cookie
-  }
+  res.cookies.set(authCookie);
+  res.cookies.set(userCookie);
 
   return res;
 }
