@@ -1,20 +1,37 @@
+ // C:\Users\steph\thebloodroom\app\lib\chant.ts
+
 "use server";
 
-import { createClient } from "@supabase/supabase-js";
-
-// 🔑 Create a Supabase client with anon key (safe on frontend)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { cookies } from "next/headers";
+import { supabase } from "./supabaseClient";
 
 /**
  * Insert a new chant into the Bloodroom
+ * Resolves the current user automatically from br_user cookie.
  */
-export async function insertChant(text: string, userId: string) {
+export async function insertChant(text: string) {
+  const cookieStore = cookies();
+  const username = cookieStore.get("br_user")?.value;
+
+  if (!username) {
+    throw new Error("Not authenticated. Please log in first.");
+  }
+
+  // Look up the User row from Supabase
+  const { data: user, error: userError } = await supabase
+    .from("users") // ✅ lowercase table name
+    .select("id, username")
+    .eq("username", username)
+    .single();
+
+  if (userError || !user) {
+    throw new Error("User not found or not authorized.");
+  }
+
+  // Insert the chant
   const { data, error } = await supabase
     .from("chants")
-    .insert([{ text, user_id: userId }])
+    .insert([{ message: text, user_id: user.id, role: user.role }])
     .select();
 
   if (error) {

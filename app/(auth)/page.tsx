@@ -1,13 +1,12 @@
  // C:\Users\steph\thebloodroom\app\(auth)\page.tsx
-
-export const dynamic = "force-dynamic"; // disable prerender
-
 "use client";
 
 import { useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
 
-// ...rest of your login page
+// 🚨 force runtime dynamic to prevent Vercel from prerendering this page
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function LoginInner() {
   const [username, setUsername] = useState("");
@@ -30,7 +29,7 @@ function LoginInner() {
       const data = await res.json();
 
       if (res.ok && data?.redirect) {
-        router.push(data.redirect); // 🌟 go where API tells us
+        router.push(data.redirect);
       } else {
         setError(data?.error || "Login failed — check your credentials.");
       }

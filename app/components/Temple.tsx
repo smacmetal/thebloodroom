@@ -225,7 +225,167 @@ export default function Temple({
           )}
         </div>
 
-        {/* ... rest of your component unchanged ... */}
+        {/* Editor + Send */}
+        <div className="rounded-2xl border border-[#4b2228] bg-[#1a0b0e] p-6 space-y-4">
+          {/* Mode toggle */}
+          <div className="flex gap-4 text-sm">
+            <button
+              type="button"
+              onClick={() => setMode("rich")}
+              className={`px-3 py-1 rounded ${
+                mode === "rich" ? "bg-rose-700 text-white" : "bg-black/40 text-zinc-300"
+              }`}
+            >
+              Rich Text
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("html")}
+              className={`px-3 py-1 rounded ${
+                mode === "html" ? "bg-rose-700 text-white" : "bg-black/40 text-zinc-300"
+              }`}
+            >
+              Raw HTML
+            </button>
+          </div>
+
+          {/* Editor */}
+          {mode === "rich" ? (
+            <RichTextEditor value={richHtml} onChange={setRichHtml} />
+          ) : (
+            <textarea
+              className="w-full min-h-[150px] bg-black/40 border border-rose-700/60 p-2 rounded text-sm"
+              value={htmlInput}
+              onChange={(e) => setHtmlInput(e.target.value)}
+              placeholder="<p>Write HTML here…</p>"
+            />
+          )}
+
+          {/* File input */}
+          <div className="space-y-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={onPickFiles}
+              className="text-sm"
+            />
+            {localFiles.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                {localFiles.map((lf, i) => (
+                  <div
+                    key={i}
+                    className="relative w-20 h-20 border border-rose-600 rounded overflow-hidden"
+                  >
+                    {lf.previewUrl ? (
+                      <img
+                        src={lf.previewUrl}
+                        alt={lf.file.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-xs p-1">{lf.file.name}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeLocalFile(i)}
+                      className="absolute top-0 right-0 bg-black/70 text-white text-xs px-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* SMS options */}
+          <div className="flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={sendAsSms} onChange={(e) => setSendAsSms(e.target.checked)} />
+              Send as SMS
+            </label>
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={sendToKing} onChange={(e) => setSendToKing(e.target.checked)} />
+              To King
+            </label>
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={sendToQueen} onChange={(e) => setSendToQueen(e.target.checked)} />
+              To Queen
+            </label>
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={sendToPrincess} onChange={(e) => setSendToPrincess(e.target.checked)} />
+              To Princess
+            </label>
+          </div>
+
+          {/* Send button */}
+          <button
+            onClick={send}
+            className="px-4 py-2 rounded-lg font-semibold text-white"
+            style={{ backgroundColor: sendButtonColor }}
+          >
+            Send to Vault
+          </button>
+        </div>
+
+        {/* Recent messages */}
+        <div className="space-y-4">
+          {loading && <p className="text-zinc-400">Loading messages…</p>}
+          {!loading && recent.length === 0 && (
+            <p className="text-zinc-400 italic">No messages yet.</p>
+          )}
+          {recent.map((m) => (
+            <div
+              key={m.uid}
+              className="rounded-xl border border-[#4b2228] bg-[#1c0e12] p-4 space-y-2"
+            >
+              <div className="flex justify-between items-center text-sm text-zinc-400">
+                <span>
+                  {m.author} — {new Date(m.timestamp || 0).toLocaleString()}
+                </span>
+                <button
+                  onClick={() => deleteMessage(m.uid)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  Delete
+                </button>
+              </div>
+              {m.contentHtml ? (
+                <div
+                  className="prose prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: m.contentHtml }}
+                />
+              ) : (
+                <p>{m.content}</p>
+              )}
+              {m.attachments?.length > 0 && (
+                <div className="flex gap-2 flex-wrap mt-2">
+                  {m.attachments.map((a, i) =>
+                    isImage(a) ? (
+                      <img
+                        key={i}
+                        src={a.url}
+                        alt={a.name || "attachment"}
+                        className="w-32 h-32 object-cover rounded border border-rose-800/40"
+                      />
+                    ) : (
+                      <a
+                        key={i}
+                        href={a.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm underline text-blue-400"
+                      >
+                        {a.name || a.url}
+                      </a>
+                    )
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
