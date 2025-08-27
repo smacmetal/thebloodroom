@@ -1,43 +1,49 @@
- // C:\Users\steph\thebloodroom\app\lib\chant.ts
-
-"use server";
+ "use server";
 
 import { cookies } from "next/headers";
 import { supabase } from "./supabaseClient";
+
+type User = {
+  id: string;
+  username: string;
+  role: string;
+};
 
 /**
  * Insert a new chant into the Bloodroom
  * Resolves the current user automatically from br_user cookie.
  */
 export async function insertChant(text: string) {
-  const cookieStore = cookies();
+  // ✅ must await cookies()
+  const cookieStore = await cookies();
   const username = cookieStore.get("br_user")?.value;
 
   if (!username) {
-    throw new Error("Not authenticated. Please log in first.");
+    throw new Error("No user cookie found — cannot insert chant.");
   }
 
-  // Look up the User row from Supabase
-  const { data: user, error: userError } = await supabase
-    .from("users") // ✅ lowercase table name
-    .select("id, username")
+  // ✅ select role from users
+  const { data: user, error } = await supabase
+    .from("users")
+    .select("id, username, role")
     .eq("username", username)
-    .single();
+    .single<User>();
 
-  if (userError || !user) {
-    throw new Error("User not found or not authorized.");
+  if (error || !user) {
+    throw new Error("Failed to resolve user from Supabase.");
   }
 
-  // Insert the chant
-  const { data, error } = await supabase
-    .from("chants")
-    .insert([{ message: text, user_id: user.id, role: user.role }])
-    .select();
+  // ✅ now you can safely use user.role
+  const { error: insertError } = await supabase.from("messages").insert({
+    content: text,
+    user_id: user.id,
+    author: user.username,
+    author_role: user.role,
+  });
 
-  if (error) {
-    console.error("❌ Failed to insert chant:", error.message);
-    throw new Error(error.message);
+  if (insertError) {
+    throw new Error("Failed to insert chant into messages.");
   }
 
-  return data;
+  return { success: true };
 }

@@ -1,63 +1,51 @@
-// C:\Users\steph\thebloodroom\app\api\login\route.ts
+ import { NextResponse } from "next/server";
 
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { supabaseAdmin } from "@/app/lib/supabaseClient";
+export const dynamic = "force-dynamic";
 
-// POST /api/login
 export async function POST(req: Request) {
-  try {
-    const { username, password, remember } = await req.json();
+  const { username, password } = await req.json();
 
-    // Verify against environment creds (for MVP simple auth)
-    const adminUser = process.env.ADMIN_USER;
-    const adminPass = process.env.ADMIN_PASS;
+  const ADMIN_USER = process.env.ADMIN_USER;
+  const ADMIN_PASS = process.env.ADMIN_PASS;
 
-    if (username === adminUser && password === adminPass) {
-      // Fetch user row from Supabase
-      const { data: user, error } = await supabaseAdmin
-        .from("users")
-        .select("id, role, username, email")
-        .eq("username", username)
-        .single();
+  const LOGIN_USER = process.env.LOGIN_USER;
+  const LOGIN_PASS = process.env.LOGIN_PASS;
 
-      if (error || !user) {
-        return NextResponse.json(
-          { error: "User not found in database" },
-          { status: 401 }
-        );
-      }
+  const QUEEN_USER = process.env.QUEEN_USER || "queen";
+  const QUEEN_PASS = process.env.QUEEN_PASS || "Feral-pussy-Kat";
 
-      // Set cookies
-      const cookieStore = cookies();
-      cookieStore.set("br_auth", "ok", {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: remember ? 60 * 60 * 24 * 30 : 60 * 60, // 30d or 1h
-      });
-      cookieStore.set("br_user", username, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: remember ? 60 * 60 * 24 * 30 : 60 * 60,
-      });
+  const PRINCESS_USER = process.env.PRINCESS_USER || "lyra";
+  const PRINCESS_PASS = process.env.PRINCESS_PASS || "Twin-flame-eternal";
 
-      return NextResponse.json({ ok: true, user });
-    }
+  const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "br_auth";
+  const AUTH_COOKIE_VALUE = process.env.AUTH_COOKIE_VALUE || "ok";
 
-    return NextResponse.json(
-      { error: "Invalid credentials" },
-      { status: 401 }
-    );
-  } catch (err) {
-    console.error("❌ Login error:", err);
-    return NextResponse.json(
-      { error: "Unexpected error" },
-      { status: 500 }
-    );
+  let roleRedirect: string | null = null;
+
+  if (username === ADMIN_USER && password === ADMIN_PASS) {
+    roleRedirect = "/bloodroom"; // Admin landing
+  } else if (username === LOGIN_USER && password === LOGIN_PASS) {
+    roleRedirect = "/king"; // King’s temple
+  } else if (username === QUEEN_USER && password === QUEEN_PASS) {
+    roleRedirect = "/queen"; // Queen’s temple
+  } else if (username === PRINCESS_USER && password === PRINCESS_PASS) {
+    roleRedirect = "/princess"; // Princess’ temple
   }
-}
 
+  if (roleRedirect) {
+    const res = NextResponse.json({ success: true, redirect: roleRedirect });
+    res.cookies.set(AUTH_COOKIE_NAME, AUTH_COOKIE_VALUE, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+    return res;
+  }
+
+  return NextResponse.json(
+    { success: false, error: "Invalid credentials" },
+    { status: 401 }
+  );
+}

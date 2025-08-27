@@ -1,20 +1,48 @@
- import { NextRequest, NextResponse } from "next/server";
+ import { NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic"; // ensure Next registers this at runtime
+export const dynamic = "force-dynamic"; // runtime eval
 
-const COOKIE = process.env.AUTH_COOKIE_NAME || "br_auth";
-const SITE   = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+export async function POST(req: Request) {
+  const { username, password } = await req.json();
 
-export async function POST(_req: NextRequest) {
-  // Option A: server-side redirect to /login after clearing cookie
-  const res = NextResponse.redirect(new URL("/login", SITE));
-  res.cookies.set(COOKIE, "", { path: "/", expires: new Date(0) });
-  return res;
-}
+  const ADMIN_USER = process.env.ADMIN_USER;
+  const ADMIN_PASS = process.env.ADMIN_PASS;
+  const LOGIN_USER = process.env.LOGIN_USER;
+  const LOGIN_PASS = process.env.LOGIN_PASS;
 
-// Optional: GET route to verify from a browser
-export async function GET(_req: NextRequest) {
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set(COKIE, "", { path: "/", expires: new Date(0) });
-  return res;
+  const QUEEN_USER = process.env.QUEEN_USER || "queen";
+  const QUEEN_PASS = process.env.QUEEN_PASS || "Feral-pussy-Kat";
+
+  const PRINCESS_USER = process.env.PRINCESS_USER || "lyra";
+  const PRINCESS_PASS = process.env.PRINCESS_PASS || "Twin-flame-eternal";
+
+  const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "br_auth";
+  const AUTH_COOKIE_VALUE = process.env.AUTH_COOKIE_VALUE || "ok";
+
+  let roleRedirect: string | null = null;
+
+  // 🔑 Role checks
+  if (username === ADMIN_USER && password === ADMIN_PASS) {
+    roleRedirect = "/bloodroom"; // Admin (root)
+  } else if (username === LOGIN_USER && password === LOGIN_PASS) {
+    roleRedirect = "/king"; // King’s temple
+  } else if (username === QUEEN_USER && password === QUEEN_PASS) {
+    roleRedirect = "/queen"; // Queen’s temple
+  } else if (username === PRINCESS_USER && password === PRINCESS_PASS) {
+    roleRedirect = "/princess"; // Princess’ temple
+  }
+
+  if (roleRedirect) {
+    const res = NextResponse.json({ success: true, redirect: roleRedirect });
+    res.cookies.set(AUTH_COOKIE_NAME, AUTH_COOKIE_VALUE, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+    return res;
+  }
+
+  return NextResponse.json({ success: false, error: "Invalid credentials" }, { status: 401 });
 }
