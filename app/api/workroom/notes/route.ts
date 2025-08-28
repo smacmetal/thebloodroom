@@ -10,6 +10,8 @@ type Note = {
   content: string;
   content_html: string;
   created_at: string;
+  user_id?: string | null;
+  author_role?: string | null;
 };
 
 /** GET → list notes */
@@ -28,28 +30,41 @@ export async function GET() {
   }
 }
 
-// POST → insert note
+/** POST → insert note */
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const author = body.author || "King";
+
+    const author = body.author || "King"; // ✅ required
     const content_html = typeof body.content_html === "string" ? body.content_html : "";
-    const content = typeof body.content === "string"
-      ? body.content
-      : content_html.replace(/<[^>]*>/g, "").trim();
-    const auth_id = body.auth_id || null;
+    const content =
+      typeof body.content === "string"
+        ? body.content
+        : content_html.replace(/<[^>]*>/g, "").trim();
+
+    const user_id = body.auth_id || null;
+    const author_role = body.author_role || null;
 
     if (!content && !content_html) {
       return NextResponse.json({ ok: false, error: "Empty note" }, { status: 400 });
     }
 
-    const { error } = await supabase.from("workroom_notes").insert([
-      { author, content, content_html, user_id: auth_id },
-    ]);
+    const { data, error } = await supabase.from("workroom_notes").insert(
+      [
+        {
+          author,
+          content,
+          content_html,
+          user_id,
+          author_role,
+        },
+      ],
+      { defaultToNull: true } // ensures omitted cols don’t break
+    ).select(); // 👈 return inserted row(s)
 
     if (error) throw error;
 
-    return NextResponse.json({ ok: true }, { status: 201 });
+    return NextResponse.json({ ok: true, note: data?.[0] }, { status: 201 });
   } catch (err: any) {
     console.error("POST /workroom/notes error:", err);
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
@@ -69,11 +84,7 @@ export async function DELETE(req: Request) {
       );
     }
 
-    const { error } = await supabase
-      .from("workroom_notes")
-      .delete()
-      .eq("id", id);
-
+    const { error } = await supabase.from("workroom_notes").delete().eq("id", id);
     if (error) throw error;
 
     return NextResponse.json({ ok: true }, { status: 200 });
