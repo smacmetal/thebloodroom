@@ -35,39 +35,44 @@ function LoginInner() {
         <h1 className="text-2xl font-bold text-center mb-6">Enter The Bloodroom</h1>
 
         <div className="mb-4">
-          <label className="block mb-1">Username</label>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-3 py-2 rounded bg-black/40 border border-rose-700/60 focus:outline-none focus:ring focus:ring-rose-600"
-            autoComplete="username"
-            required
-          />
-        </div>
+  <label htmlFor="username" className="block mb-1">Username</label>
+  <input
+    id="username"
+    name="username"
+    type="text"
+    value={username}
+    onChange={(e) => setUsername(e.target.value)}
+    className="w-full px-3 py-2 rounded bg-black/40 border border-rose-700/60 focus:outline-none focus:ring focus:ring-rose-600"
+    autoComplete="username"
+    required
+  />
+</div>
 
-        <div className="mb-4">
-          <label className="block mb-1">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 rounded bg-black/40 border border-rose-700/60 focus:outline-none focus:ring focus:ring-rose-600"
-            autoComplete="current-password"
-            required
-          />
-        </div>
+<div className="mb-4">
+  <label htmlFor="password" className="block mb-1">Password</label>
+  <input
+    id="password"
+    name="password"
+    type="password"
+    value={password}
+    onChange={(e) => setPassword(e.target.value)}
+    className="w-full px-3 py-2 rounded bg-black/40 border border-rose-700/60 focus:outline-none focus:ring focus:ring-rose-600"
+    autoComplete="current-password"
+    required
+  />
+</div>
 
-        {/* 👇 NEW remember me */}
-        <label className="flex items-center gap-2 text-sm text-zinc-300 mb-6 select-none">
-          <input
-            type="checkbox"
-            checked={remember}
-            onChange={(e) => setRemember(e.target.checked)}
-            className="h-4 w-4 accent-rose-600"
-          />
-          Remember me on this device
-        </label>
+<label className="flex items-center gap-2 text-sm text-zinc-300 mb-6 select-none">
+  <input
+    id="remember"
+    name="remember"
+    type="checkbox"
+    checked={remember}
+    onChange={(e) => setRemember(e.target.checked)}
+    className="h-4 w-4 accent-rose-600"
+  />
+  Remember me on this device
+</label>
 
         <button
           type="submit"
