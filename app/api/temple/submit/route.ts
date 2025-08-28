@@ -1,4 +1,4 @@
- // app/api/temple/submit/route.ts
+ // C:\Users\steph\thebloodroom\app\api\temple\submit\route.ts
 export const runtime = "nodejs"; // ✅ keep only once
 
 import { promises as fs } from "fs";
@@ -66,22 +66,26 @@ export async function POST(req: Request) {
     const id = `${ts}-${randomId(6)}`;
     const label = KEY_TO_LABEL[chamber];
 
-    // Attachments to local FS
-    const baseAttachDir = path.join(ROOT, "attachments", "wall", label, id);
-    await fs.mkdir(baseAttachDir, { recursive: true });
+    // Attachments (optional)
+    let attachments: Array<{ name?: string; path: string; type?: string; url: string; thumbUrl: string }> = [];
+    const files = form.getAll("files").filter((f) => {
+      return typeof f === "object" && "arrayBuffer" in f && f.name; // ✅ only real file objects
+    });
 
-    const attachments: Array<{ name?: string; path: string; type?: string; url: string; thumbUrl: string }> = [];
-    const files = form.getAll("files");
-    for (const anyFile of files) {
-      const f: any = anyFile as any;
-      if (!f?.arrayBuffer || !f.name) continue;
-      const buf = Buffer.from(await f.arrayBuffer());
-      const safeName = f.name.replace(/[^\w.\-]+/g, "_");
-      const abs = path.join(baseAttachDir, safeName);
-      await fs.writeFile(abs, buf);
-      const rel = path.join("attachments", "wall", label, id, safeName);
-      const url = toPublicUrl(rel);
-      attachments.push({ name: safeName, path: rel, type: f.type || undefined, url, thumbUrl: url });
+    if (files.length > 0) {
+      const baseAttachDir = path.join(ROOT, "attachments", "wall", label, id);
+      await fs.mkdir(baseAttachDir, { recursive: true });
+
+      for (const anyFile of files) {
+        const f: any = anyFile;
+        const buf = Buffer.from(await f.arrayBuffer());
+        const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+        const abs = path.join(baseAttachDir, safeName);
+        await fs.writeFile(abs, buf);
+        const rel = path.join("attachments", "wall", label, id, safeName);
+        const url = toPublicUrl(rel);
+        attachments.push({ name: safeName, path: rel, type: f.type || undefined, url, thumbUrl: url });
+      }
     }
 
     const basePayload = {
@@ -92,10 +96,10 @@ export async function POST(req: Request) {
       contentHtml,
       format,
       sms: smsFlag,
-      attachments,
+      attachments: attachments.length ? attachments : null, // ✅ only real
       timestamp: ts,
       chamber: label,
-      auth_id, // 👈 anchor message to user account
+      auth_id,
     };
 
     // Write JSON locally (legacy)
@@ -124,6 +128,7 @@ export async function POST(req: Request) {
         sms: smsFlag,
         auth_id,
         timestamp: ts,
+        attachments: attachments.length ? attachments : null, // ✅ DB mirror
       },
     ]);
     if (error) console.error("Supabase insert error:", error);
