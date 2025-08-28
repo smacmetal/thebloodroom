@@ -150,18 +150,27 @@ export default function Temple({
   }
 
   async function send() {
-    const recipients: string[] = [];
-    if (sendToKing) recipients.push("King");
-    if (sendToQueen) recipients.push("Queen");
-    if (sendToPrincess) recipients.push("Princess");
+  const recipients: string[] = [];
+  if (sendToKing) recipients.push("King");
+  if (sendToQueen) recipients.push("Queen");
+  if (sendToPrincess) recipients.push("Princess");
 
-    const contentHtml = (mode === "rich" ? richHtml : htmlInput).trim();
-    const content = htmlToText(contentHtml);
+  const contentHtml = (mode === "rich" ? richHtml : htmlInput).trim();
+  const content = htmlToText(contentHtml);
 
-    if (!content && !contentHtml && localFiles.length === 0) {
-      alert("Please enter a message or attach a file.");
-      return;
-    }
+  // ✅ FIX: make sure we don’t reject valid rich text
+  const hasMessage =
+    !!contentHtml.replace(/<[^>]*>/g, "").trim() || // strip tags, still has text
+    !!content || // plain text fallback
+    localFiles.length > 0;
+
+  if (!hasMessage) {
+    alert("Please enter a message or attach a file.");
+    return;
+  }
+
+  // fetch auth_id, build FormData ... (rest stays the same)
+}
 
     // 👇 NEW: fetch current user id from API
     let auth_id = "";

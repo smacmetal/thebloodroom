@@ -10,6 +10,7 @@ import BulletList from "@tiptap/extension-bullet-list";
 import OrderedList from "@tiptap/extension-ordered-list";
 import ListItem from "@tiptap/extension-list-item";
 import Underline from "@tiptap/extension-underline";
+import Heading from "@tiptap/extension-heading"; // 👈 NEW
 
 export default function RichTextEditor({
   value,
@@ -20,7 +21,12 @@ export default function RichTextEditor({
 }) {
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        heading: false, // disable default heading so we can configure
+      }),
+      Heading.configure({
+        levels: [1, 2, 3], // support H1, H2, H3
+      }),
       Link.configure({
         openOnClick: true,
         autolink: true,
@@ -35,12 +41,11 @@ export default function RichTextEditor({
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
     editorProps: {
       attributes: {
-        // include .editor-content so your CSS rules apply
         class:
           "editor-content outline-none prose prose-invert max-w-none prose-p:m-0 prose-li:my-0",
       },
     },
-    immediatelyRender: false, // SSR-safe
+    immediatelyRender: false,
   });
 
   if (!editor) return null;
@@ -100,13 +105,34 @@ export default function RichTextEditor({
         <button
           type="button"
           onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 1 }).run()
+          }
+          className={btn(editor.isActive("heading", { level: 1 }))} // H1
+          title="H1"
+        >
+          H1
+        </button>
+        <button
+          type="button"
+          onClick={() =>
             editor.chain().focus().toggleHeading({ level: 2 }).run()
           }
-          className={btn(editor.isActive("heading", { level: 2 }))}
+          className={btn(editor.isActive("heading", { level: 2 }))} // H2
           title="H2"
         >
           H2
         </button>
+        <button
+          type="button"
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 3 }).run()
+          }
+          className={btn(editor.isActive("heading", { level: 3 }))} // H3
+          title="H3"
+        >
+          H3
+        </button>
+
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
