@@ -1,28 +1,18 @@
  // C:\Users\steph\thebloodroom\app\api\workroom\notes\route.ts
-import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabaseClient";
-import { promises as fs } from "fs";
-import path from "path";
-
 export const runtime = "nodejs";
 
-const ROOT = process.cwd();
-const ATTACH_DIR = path.join(ROOT, "attachments", "workroom");
+import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabaseClient";
 
-type NoteInsert = {
+type Note = {
+  id: string;
   author: string;
   content: string;
   content_html: string;
-  attachments?: Array<{ name?: string; url: string; type?: string }> | null;
-  user_id?: string | null;
-  author_role?: string | null;
+  created_at: string;
+  user_id?: string;
+  author_role?: string;
 };
-
-// Utils
-function safeName(name: string) {
-  return name.replace(/[^\w.\-]+/g, "_");
-}
-const toPublicUrl = (p: string) => `/${p.replace(/\\/g, "/").replace(/^\/+/, "")}`;
 
 /** GET → list notes */
 export async function GET() {
@@ -33,72 +23,86 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    return NextResponse.json({ ok: true, notes: data }, { status: 200 });
+    return NextResponse.json({ ok: true, notes: data as Note[] }, { status: 200 });
   } catch (err: any) {
     console.error("GET /workroom/notes error:", err);
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
 }
 
-/** POST → insert note (JSON or FormData w/ attachments) */
+/** POST → insert note (with optional attachments) */
 export async function POST(req: Request) {
   try {
-    const ctype = req.headers.get("content-type") || "";
-    let payload: NoteInsert = {
-      author: "King",
-      content: "",
-      content_html: "",
-      attachments: null,
-    };
+    // Decide: JSON vs FormData
+    const contentType = req.headers.get("content-type") || "";
+    let notePayload: any = {};
+    let attachments: any[] = [];
 
-    if (ctype.includes("multipart/form-data")) {
-      // --- FormData ---
-      const form = await req.formData();
-      payload.author = String(form.get("author") || "King");
-      payload.content_html = String(form.get("content_html") || "");
-      payload.content =
-        String(form.get("content") || "") ||
-        payload.content_html.replace(/<[^>]*>/g, "").trim();
-      payload.user_id = form.get("auth_id")?.toString() || null;
-      payload.author_role = form.get("author_role")?.toString() || null;
-
-      // Attachments
-      const files = form.getAll("files").filter((f) => typeof f === "object" && "arrayBuffer" in f);
-      if (files.length) {
-        const noteDir = path.join(ATTACH_DIR, Date.now().toString());
-        await fs.mkdir(noteDir, { recursive: true });
-
-        const attachments: NoteInsert["attachments"] = [];
-        for (const anyFile of files) {
-          const f: any = anyFile;
-          const buf = Buffer.from(await f.arrayBuffer());
-          const fname = safeName(f.name);
-          const abs = path.join(noteDir, fname);
-          await fs.writeFile(abs, buf);
-          const rel = path.join("attachments", "workroom", path.basename(noteDir), fname);
-          const url = toPublicUrl(rel);
-          attachments.push({ name: fname, url, type: f.type || undefined });
-        }
-        payload.attachments = attachments;
-      }
+    if (contentType.includes("application/json")) {
+      // Simple JSON payload
+      notePayload = await req.json().catch(() => ({}));
     } else {
-      // --- JSON ---
-      const body = await req.json().catch(() => ({}));
-      payload.author = body.author || "King";
-      payload.content_html = typeof body.content_html === "string" ? body.content_html : "";
-      payload.content =
-        typeof body.content === "string"
-          ? body.content
-          : payload.content_html.replace(/<[^>]*>/g, "").trim();
-      payload.user_id = body.auth_id || null;
-      payload.author_role = body.author_role || null;
+      // FormData with files
+      const form = await req.formData();
+      notePayload = {
+        author: form.get("author") || "King",
+        content: form.get("content") || "",
+        content_html: form.get("content_html") || "",
+        user_id: form.get("auth_id") || null,
+        author_role: form.get("author_role") || null,
+      };
+
+      const files = form.getAll("files").filter(
+        (f) => typeof f === "object" && "arrayBuffer" in f && f.name
+      );
+      for (const anyFile of files) {
+        const f: any = anyFile;
+        const buf = Buffer.from(await f.arrayBuffer());
+        const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+        const storagePath = `workroom/${Date.now()}-${safeName}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from("attachments")
+          .upload(storagePath, buf, {
+            contentType: f.type || "application/octet-stream",
+            upsert: true,
+          });
+
+        if (!uploadErr) {
+          const { data: publicUrlData } = supabase.storage
+            .from("attachments")
+            .getPublicUrl(storagePath);
+
+          attachments.push({
+            name: safeName,
+            url: publicUrlData.publicUrl,
+            path: storagePath,
+            type: f.type || undefined,
+          });
+        } else {
+          console.error("Workroom note upload failed:", uploadErr.message);
+        }
+      }
     }
 
-    if (!payload.content && !payload.content_html && !payload.attachments) {
+    // Guard against empties
+    const plain = (notePayload.content_html || "").replace(/<[^>]+>/g, "").trim();
+    if (!plain && !notePayload.content && attachments.length === 0) {
       return NextResponse.json({ ok: false, error: "Empty note" }, { status: 400 });
     }
 
-    const { error } = await supabase.from("workroom_notes").insert([payload]);
+    // Insert note
+    const { error } = await supabase.from("workroom_notes").insert([
+      {
+        author: notePayload.author || "King",
+        content: notePayload.content || plain,
+        content_html: notePayload.content_html || notePayload.content || "",
+        user_id: notePayload.user_id || null,
+        author_role: notePayload.author_role || null,
+        attachments: attachments.length ? attachments : null, // store refs inline
+      },
+    ]);
+
     if (error) throw error;
 
     return NextResponse.json({ ok: true }, { status: 201 });
@@ -108,11 +112,12 @@ export async function POST(req: Request) {
   }
 }
 
-/** DELETE → remove note by id */
+/** DELETE → remove a note by id */
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
+
     if (!id) {
       return NextResponse.json({ ok: false, error: "Missing note id" }, { status: 400 });
     }

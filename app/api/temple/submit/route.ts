@@ -42,8 +42,12 @@ export async function POST(req: Request) {
     const form = await req.formData();
 
     const chamberRaw = String(form.get("chamber") || "").toLowerCase();
-    const chamber: ChamberKey = (["king", "queen", "princess"].includes(chamberRaw) ? chamberRaw : "king") as ChamberKey;
-    const author = (String(form.get("author") || KEY_TO_LABEL[chamber]).trim() || KEY_TO_LABEL[chamber]) as ChamberLabel;
+    const chamber: ChamberKey = (["king", "queen", "princess"].includes(chamberRaw)
+      ? chamberRaw
+      : "king") as ChamberKey;
+
+    const author = (String(form.get("author") || KEY_TO_LABEL[chamber]).trim() ||
+      KEY_TO_LABEL[chamber]) as ChamberLabel;
 
     const auth_id = String(form.get("auth_id") || "");
 
@@ -52,7 +56,9 @@ export async function POST(req: Request) {
 
     const recipients: ChamberLabel[] = [];
     form.getAll("recipients").forEach((r) => {
-      if (typeof r === "string" && ["King", "Queen", "Princess"].includes(r)) recipients.push(r as ChamberLabel);
+      if (typeof r === "string" && ["King", "Queen", "Princess"].includes(r)) {
+        recipients.push(r as ChamberLabel);
+      }
     });
 
     const contentHtml = String(form.get("contentHtml") || "");
@@ -62,40 +68,46 @@ export async function POST(req: Request) {
     const id = `${ts}-${randomId(6)}`;
     const label = KEY_TO_LABEL[chamber];
 
-    // ✅ Upload attachments to Supabase storage
-    let attachments: Array<{ name?: string; path: string; type?: string; url: string; thumbUrl: string }> = [];
-    const files = form.getAll("files").filter((f) => typeof f === "object" && "arrayBuffer" in f && f.name);
+    // ✅ Attachments → Supabase Storage
+    let attachments: Array<{ name?: string; url: string; path: string; type?: string; thumbUrl: string }> = [];
+    const files = form.getAll("files").filter(
+      (f) => typeof f === "object" && "arrayBuffer" in f && f.name
+    );
 
-    for (const anyFile of files) {
-      const f: any = anyFile;
-      const buf = Buffer.from(await f.arrayBuffer());
-      const ext = f.name.split(".").pop();
-      const safeName = f.name.replace(/[^\w.\-]+/g, "_");
-      const filePath = `temple/${label}/${id}/${safeName}`;
+    if (files.length > 0) {
+      for (const anyFile of files) {
+        const f: any = anyFile;
+        const buf = Buffer.from(await f.arrayBuffer());
+        const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+        const storagePath = `wall/${label}/${id}/${safeName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("attachments") // 👈 must exist in Supabase
-        .upload(filePath, buf, {
-          contentType: f.type,
-          upsert: true,
-        });
+        // Upload to Supabase Storage (attachments bucket)
+        const { error: uploadErr } = await supabase.storage
+          .from("attachments")
+          .upload(storagePath, buf, {
+            contentType: f.type || "application/octet-stream",
+            upsert: true,
+          });
 
-      if (uploadError) throw uploadError;
+        if (uploadErr) {
+          console.error("Attachment upload failed:", uploadErr.message);
+        } else {
+          const { data: publicUrlData } = supabase.storage
+            .from("attachments")
+            .getPublicUrl(storagePath);
 
-      const { data: publicUrlData } = supabase.storage
-        .from("attachments")
-        .getPublicUrl(filePath);
-
-      attachments.push({
-        name: safeName,
-        path: filePath,
-        type: f.type || undefined,
-        url: publicUrlData.publicUrl,
-        thumbUrl: publicUrlData.publicUrl,
-      });
+          attachments.push({
+            name: safeName,
+            path: storagePath,
+            type: f.type || undefined,
+            url: publicUrlData.publicUrl,
+            thumbUrl: publicUrlData.publicUrl,
+          });
+        }
+      }
     }
 
-    // Insert into Supabase "messages" table
+    // ✅ Save to messages table
     const { error } = await supabase.from("messages").insert([
       {
         uid: id,
@@ -107,12 +119,11 @@ export async function POST(req: Request) {
         sms: smsFlag,
         auth_id,
         timestamp: ts,
-        attachments, // now stored as JSON
       },
     ]);
     if (error) console.error("Supabase insert error:", error);
 
-    // SMS fanout
+    // ✅ SMS fanout
     if (smsFlag && canSms && recipients.length) {
       const from = FROM_BY_AUTHOR[author];
       const stripped = content || contentHtml.replace(/<[^>]*>/g, " ").trim();

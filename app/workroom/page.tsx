@@ -1,25 +1,24 @@
- // C:\Users\steph\thebloodroom\app\workroom\page.tsx
-"use client";
+ "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import RichTextEditor from "@/app/components/RichTextEditor";
+
+type Attachment = {
+  name?: string;
+  url: string;
+  path: string;
+  type?: string;
+};
 
 type Note = {
   id: string;
+  user_id?: string;
   author: string;
   content: string;
   content_html: string;
   created_at: string;
-  attachments?: {
-    name?: string;
-    url: string;
-    type?: string;
-  }[];
-};
-
-type LocalFile = {
-  file: File;
-  previewUrl: string;
+  author_role?: string;
+  attachments?: Attachment[] | null;
 };
 
 export default function WorkroomPage() {
@@ -27,8 +26,7 @@ export default function WorkroomPage() {
   const [submitting, setSubmitting] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
-  const [localFiles, setLocalFiles] = useState<LocalFile[]>([]);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
 
   async function loadNotes() {
     setLoading(true);
@@ -48,44 +46,22 @@ export default function WorkroomPage() {
     loadNotes();
   }, []);
 
-  function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    const next: LocalFile[] = files.map((f) => ({
-      file: f,
-      previewUrl: /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(f.name)
-        ? URL.createObjectURL(f)
-        : "",
-    }));
-    setLocalFiles((prev) => prev.concat(next));
-    if (fileRef.current) fileRef.current.value = "";
-  }
-
-  function removeLocalFile(i: number) {
-    setLocalFiles((prev) => {
-      const copy = [...prev];
-      const removed = copy.splice(i, 1)[0];
-      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
-      return copy;
-    });
-  }
-
   async function submitNote() {
     const content_html = (html || "").trim();
     const plain = content_html.replace(/<[^>]+>/g, "").trim();
 
-    if (!plain && !content_html && localFiles.length === 0) {
-      alert("Please write something or attach files.");
+    if (!plain && !content_html && files.length === 0) {
+      alert("Please write something first.");
       return;
     }
 
     setSubmitting(true);
     try {
       const fd = new FormData();
-      fd.append("author", "King"); // later: resolve from session/auth
+      fd.append("author", "King");
       fd.append("content", plain);
       fd.append("content_html", content_html);
-
-      localFiles.forEach((lf) => fd.append("files", lf.file, lf.file.name));
+      files.forEach((f) => fd.append("files", f, f.name));
 
       const res = await fetch("/api/workroom/notes", {
         method: "POST",
@@ -94,13 +70,8 @@ export default function WorkroomPage() {
 
       if (!res.ok) throw new Error(await res.text());
 
-      // cleanup
       setHtml("<p></p>");
-      setLocalFiles((prev) => {
-        prev.forEach((lf) => lf.previewUrl && URL.revokeObjectURL(lf.previewUrl));
-        return [];
-      });
-
+      setFiles([]);
       await loadNotes();
     } catch (err) {
       console.error("Failed to save note:", err);
@@ -131,47 +102,20 @@ export default function WorkroomPage() {
         <div className="rounded-2xl border border-[#4b2228] bg-[#261217] p-6">
           <h1 className="text-4xl font-bold text-[#ffe0e7]">🛠️ Workroom</h1>
           <p className="mt-2 text-sm text-[#e0a8b1]">
-            Draft, plan, and iterate. Rich Text with quotes, lists, code, and attachments.
-            All saved into the Vault’s lineage.
+            Draft, plan, and iterate. Rich Text with quotes, lists, code, and
+            blocks. All saved into the Vault’s lineage.
           </p>
         </div>
 
         {/* Editor */}
         <div className="rounded-2xl border border-[#3a1b20] bg-[#1a0b0e] p-5 space-y-4">
           <RichTextEditor value={html} onChange={setHtml} />
-
-          {/* File input */}
-          <div className="space-y-2">
-            <input ref={fileRef} type="file" multiple onChange={onPickFiles} />
-            {localFiles.length > 0 && (
-              <div className="flex gap-2 flex-wrap">
-                {localFiles.map((lf, i) => (
-                  <div
-                    key={i}
-                    className="relative w-20 h-20 border border-rose-600 rounded overflow-hidden"
-                  >
-                    {lf.previewUrl ? (
-                      <img
-                        src={lf.previewUrl}
-                        alt={lf.file.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-xs p-1">{lf.file.name}</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeLocalFile(i)}
-                      className="absolute top-0 right-0 bg-black/70 text-white text-xs px-1"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
+          <input
+            type="file"
+            multiple
+            className="block text-sm mt-2"
+            onChange={(e) => setFiles(Array.from(e.target.files || []))}
+          />
           <div className="flex justify-end">
             <button
               onClick={submitNote}
@@ -215,29 +159,19 @@ export default function WorkroomPage() {
                 ) : (
                   <p>{n.content}</p>
                 )}
-
                 {n.attachments && n.attachments.length > 0 && (
-                  <div className="mt-2 flex gap-2 flex-wrap">
-                    {n.attachments.map((a, i) =>
-                      /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(a.url) ? (
-                        <img
-                          key={i}
-                          src={a.url}
-                          alt={a.name || "attachment"}
-                          className="w-32 h-32 object-cover rounded border border-rose-800/40"
-                        />
-                      ) : (
-                        <a
-                          key={i}
-                          href={a.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-sm underline text-blue-400"
-                        >
-                          {a.name || a.url}
-                        </a>
-                      )
-                    )}
+                  <div className="mt-2 space-y-1">
+                    {n.attachments.map((a, i) => (
+                      <a
+                        key={i}
+                        href={a.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block text-sm underline text-blue-400"
+                      >
+                        {a.name || a.url}
+                      </a>
+                    ))}
                   </div>
                 )}
               </div>
