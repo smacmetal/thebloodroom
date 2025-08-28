@@ -1,14 +1,11 @@
  // C:\Users\steph\thebloodroom\app\api\temple\submit\route.ts
-export const runtime = "nodejs"; // ✅ keep only once
+export const runtime = "nodejs";
 
-import { promises as fs } from "fs";
-import path from "path";
 import twilio from "twilio";
 import { supabase } from "@/lib/supabaseClient";
 
 type ChamberKey = "king" | "queen" | "princess";
 type ChamberLabel = "King" | "Queen" | "Princess";
-const ROOT = process.cwd();
 
 const KEY_TO_LABEL: Record<ChamberKey, ChamberLabel> = {
   king: "King",
@@ -39,7 +36,6 @@ function randomId(n = 6) {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   return Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
-const toPublicUrl = (p: string) => `/${p.replace(/\\/g, "/").replace(/^\/+/, "")}`;
 
 export async function POST(req: Request) {
   try {
@@ -49,7 +45,7 @@ export async function POST(req: Request) {
     const chamber: ChamberKey = (["king", "queen", "princess"].includes(chamberRaw) ? chamberRaw : "king") as ChamberKey;
     const author = (String(form.get("author") || KEY_TO_LABEL[chamber]).trim() || KEY_TO_LABEL[chamber]) as ChamberLabel;
 
-    const auth_id = String(form.get("auth_id") || ""); // 👈 NEW (passed from frontend)
+    const auth_id = String(form.get("auth_id") || "");
 
     const smsFlag = String(form.get("sms") || "false") === "true" && SMS_ENABLED;
     const format = String(form.get("format") || "text");
@@ -66,43 +62,40 @@ export async function POST(req: Request) {
     const id = `${ts}-${randomId(6)}`;
     const label = KEY_TO_LABEL[chamber];
 
-    // Attachments (optional, written to disk only)
+    // ✅ Upload attachments to Supabase storage
     let attachments: Array<{ name?: string; path: string; type?: string; url: string; thumbUrl: string }> = [];
-    const files = form.getAll("files").filter((f) => {
-      return typeof f === "object" && "arrayBuffer" in f && f.name;
-    });
+    const files = form.getAll("files").filter((f) => typeof f === "object" && "arrayBuffer" in f && f.name);
 
-    if (files.length > 0) {
-      const baseAttachDir = path.join(ROOT, "attachments", "wall", label, id);
-      await fs.mkdir(baseAttachDir, { recursive: true });
+    for (const anyFile of files) {
+      const f: any = anyFile;
+      const buf = Buffer.from(await f.arrayBuffer());
+      const ext = f.name.split(".").pop();
+      const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+      const filePath = `temple/${label}/${id}/${safeName}`;
 
-      for (const anyFile of files) {
-        const f: any = anyFile;
-        const buf = Buffer.from(await f.arrayBuffer());
-        const safeName = f.name.replace(/[^\w.\-]+/g, "_");
-        const abs = path.join(baseAttachDir, safeName);
-        await fs.writeFile(abs, buf);
-        const rel = path.join("attachments", "wall", label, id, safeName);
-        const url = toPublicUrl(rel);
-        attachments.push({ name: safeName, path: rel, type: f.type || undefined, url, thumbUrl: url });
-      }
+      const { error: uploadError } = await supabase.storage
+        .from("attachments") // 👈 must exist in Supabase
+        .upload(filePath, buf, {
+          contentType: f.type,
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from("attachments")
+        .getPublicUrl(filePath);
+
+      attachments.push({
+        name: safeName,
+        path: filePath,
+        type: f.type || undefined,
+        url: publicUrlData.publicUrl,
+        thumbUrl: publicUrlData.publicUrl,
+      });
     }
 
-    const basePayload = {
-      id,
-      author,
-      recipients,
-      content,
-      contentHtml,
-      format,
-      sms: smsFlag,
-      attachments: attachments.length ? attachments : null, // ✅ still returned in API response
-      timestamp: ts,
-      chamber: label,
-      auth_id,
-    };
-
-    // Insert into Supabase "messages" table (no attachments for now)
+    // Insert into Supabase "messages" table
     const { error } = await supabase.from("messages").insert([
       {
         uid: id,
@@ -114,6 +107,7 @@ export async function POST(req: Request) {
         sms: smsFlag,
         auth_id,
         timestamp: ts,
+        attachments, // now stored as JSON
       },
     ]);
     if (error) console.error("Supabase insert error:", error);
