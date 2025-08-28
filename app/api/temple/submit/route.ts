@@ -66,10 +66,10 @@ export async function POST(req: Request) {
     const id = `${ts}-${randomId(6)}`;
     const label = KEY_TO_LABEL[chamber];
 
-    // Attachments (optional)
+    // Attachments (optional, written to disk only)
     let attachments: Array<{ name?: string; path: string; type?: string; url: string; thumbUrl: string }> = [];
     const files = form.getAll("files").filter((f) => {
-      return typeof f === "object" && "arrayBuffer" in f && f.name; // ✅ only real file objects
+      return typeof f === "object" && "arrayBuffer" in f && f.name;
     });
 
     if (files.length > 0) {
@@ -96,27 +96,13 @@ export async function POST(req: Request) {
       contentHtml,
       format,
       sms: smsFlag,
-      attachments: attachments.length ? attachments : null, // ✅ only real
+      attachments: attachments.length ? attachments : null, // ✅ still returned in API response
       timestamp: ts,
       chamber: label,
       auth_id,
     };
 
-    // Write JSON locally (legacy)
-    const authorDir = path.join(ROOT, "data", chamber, "messages");
-    await fs.mkdir(authorDir, { recursive: true });
-    await fs.writeFile(path.join(authorDir, `${id}.json`), JSON.stringify(basePayload, null, 2), "utf-8");
-
-    // Fan out locally
-    for (const r of recipients) {
-      const key = r.toLowerCase() as ChamberKey;
-      const recipDir = path.join(ROOT, "data", key, "messages");
-      await fs.mkdir(recipDir, { recursive: true });
-      const copy = { ...basePayload, chamber: r };
-      await fs.writeFile(path.join(recipDir, `${id}.json`), JSON.stringify(copy, null, 2), "utf-8");
-    }
-
-    // Insert into Supabase "messages" table
+    // Insert into Supabase "messages" table (no attachments for now)
     const { error } = await supabase.from("messages").insert([
       {
         uid: id,
@@ -128,12 +114,11 @@ export async function POST(req: Request) {
         sms: smsFlag,
         auth_id,
         timestamp: ts,
-        attachments: attachments.length ? attachments : null, // ✅ DB mirror
       },
     ]);
     if (error) console.error("Supabase insert error:", error);
 
-    // SMS
+    // SMS fanout
     if (smsFlag && canSms && recipients.length) {
       const from = FROM_BY_AUTHOR[author];
       const stripped = content || contentHtml.replace(/<[^>]*>/g, " ").trim();
