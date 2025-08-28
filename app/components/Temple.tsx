@@ -149,7 +149,7 @@ export default function Temple({
     });
   }
 
-  async function send() {
+async function send() {
   const recipients: string[] = [];
   if (sendToKing) recipients.push("King");
   if (sendToQueen) recipients.push("Queen");
@@ -158,58 +158,49 @@ export default function Temple({
   const contentHtml = (mode === "rich" ? richHtml : htmlInput).trim();
   const content = htmlToText(contentHtml);
 
-  // ✅ FIX: make sure we don’t reject valid rich text
-  const hasMessage =
-    !!contentHtml.replace(/<[^>]*>/g, "").trim() || // strip tags, still has text
-    !!content || // plain text fallback
-    localFiles.length > 0;
-
-  if (!hasMessage) {
+  if (!content && !contentHtml && localFiles.length === 0) {
     alert("Please enter a message or attach a file.");
     return;
   }
 
-  // fetch auth_id, build FormData ... (rest stays the same)
-}
-
-    // 👇 NEW: fetch current user id from API
-    let auth_id = "";
-    try {
-      const res = await fetch("/api/whoami");
-      if (res.ok) {
-        const j = await res.json();
-        auth_id = j?.id || "";
-      }
-    } catch {}
-
-    const fd = new FormData();
-    fd.append("chamber", chamberKey);
-    fd.append("author", chamberLabel);
-    fd.append("format", mode);
-    fd.append("sms", String(!!sendAsSms));
-    fd.append("content", content);
-    fd.append("contentHtml", contentHtml);
-    if (auth_id) fd.append("auth_id", auth_id); // 👈 send to backend
-    recipients.forEach((r) => fd.append("recipients", r));
-    localFiles.forEach((lf) => fd.append("files", lf.file, lf.file.name));
-
-    try {
-      const res = await fetch("/api/temple/submit", { method: "POST", body: fd });
-      if (!res.ok) throw new Error(await res.text());
-
-      setRichHtml("");
-      setHtmlInput("");
-      setLocalFiles((prev) => {
-        prev.forEach((lf) => lf.previewUrl && URL.revokeObjectURL(lf.previewUrl));
-        return [];
-      });
-
-      await load();
-    } catch (e) {
-      console.error(e);
-      alert("Failed to send.");
+  // 👇 fetch current user id from API
+  let auth_id = "";
+  try {
+    const res = await fetch("/api/whoami");
+    if (res.ok) {
+      const j = await res.json();
+      auth_id = j?.id || "";
     }
+  } catch {}
+
+  const fd = new FormData();
+  fd.append("chamber", chamberKey);
+  fd.append("author", chamberLabel);
+  fd.append("format", mode);
+  fd.append("sms", String(!!sendAsSms));
+  fd.append("content", content);
+  fd.append("contentHtml", contentHtml);
+  if (auth_id) fd.append("auth_id", auth_id);
+  recipients.forEach((r) => fd.append("recipients", r));
+  localFiles.forEach((lf) => fd.append("files", lf.file, lf.file.name));
+
+  try {
+    const res = await fetch("/api/temple/submit", { method: "POST", body: fd });
+    if (!res.ok) throw new Error(await res.text());
+
+    setRichHtml("");
+    setHtmlInput("");
+    setLocalFiles((prev) => {
+      prev.forEach((lf) => lf.previewUrl && URL.revokeObjectURL(lf.previewUrl));
+      return [];
+    });
+
+    await load(); // ✅ allowed inside async
+  } catch (e) {
+    console.error(e);
+    alert("Failed to send.");
   }
+}
 
   const recent = useMemo(() => messages, [messages]);
 
