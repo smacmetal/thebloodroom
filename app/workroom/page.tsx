@@ -3,13 +3,6 @@
 import { useEffect, useState } from "react";
 import RichTextEditor from "@/app/components/RichTextEditor";
 
-type Attachment = {
-  name?: string;
-  url: string;
-  path: string;
-  type?: string;
-};
-
 type Note = {
   id: string;
   user_id?: string;
@@ -17,8 +10,6 @@ type Note = {
   content: string;
   content_html: string;
   created_at: string;
-  author_role?: string;
-  attachments?: Attachment[] | null;
 };
 
 export default function WorkroomPage() {
@@ -26,7 +17,6 @@ export default function WorkroomPage() {
   const [submitting, setSubmitting] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
-  const [files, setFiles] = useState<File[]>([]);
 
   async function loadNotes() {
     setLoading(true);
@@ -50,28 +40,34 @@ export default function WorkroomPage() {
     const content_html = (html || "").trim();
     const plain = content_html.replace(/<[^>]+>/g, "").trim();
 
-    if (!plain && !content_html && files.length === 0) {
+    if (!plain && !content_html) {
       alert("Please write something first.");
       return;
     }
 
     setSubmitting(true);
     try {
-      const fd = new FormData();
-      fd.append("author", "King");
-      fd.append("content", plain);
-      fd.append("content_html", content_html);
-      files.forEach((f) => fd.append("files", f, f.name));
+      let auth_id = "";
+      try {
+        const res = await fetch("/api/whoami");
+        if (res.ok) {
+          const j = await res.json();
+          auth_id = j?.id || "";
+        }
+      } catch {}
 
       const res = await fetch("/api/workroom/notes", {
         method: "POST",
-        body: fd,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          author: "King",
+          content: plain,
+          content_html,
+          auth_id,
+        }),
       });
-
       if (!res.ok) throw new Error(await res.text());
-
       setHtml("<p></p>");
-      setFiles([]);
       await loadNotes();
     } catch (err) {
       console.error("Failed to save note:", err);
@@ -84,9 +80,7 @@ export default function WorkroomPage() {
   async function deleteNote(id: string) {
     if (!confirm("Delete this note?")) return;
     try {
-      const res = await fetch(`/api/workroom/notes?id=${id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/workroom/notes?id=${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(await res.text());
       await loadNotes();
     } catch (err) {
@@ -100,22 +94,16 @@ export default function WorkroomPage() {
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="rounded-2xl border border-[#4b2228] bg-[#261217] p-6">
-          <h1 className="text-4xl font-bold text-[#ffe0e7]">🛠️ Workroom</h1>
+          <h1 className="text-4xl font-bold text-[#ffe0e7]">Workroom</h1>
           <p className="mt-2 text-sm text-[#e0a8b1]">
-            Draft, plan, and iterate. Rich Text with quotes, lists, code, and
-            blocks. All saved into the Vault’s lineage.
+            Draft, plan, and iterate. Rich Text with quotes, lists, code, and blocks.
+            All saved into the Vault’s lineage.
           </p>
         </div>
 
         {/* Editor */}
         <div className="rounded-2xl border border-[#3a1b20] bg-[#1a0b0e] p-5 space-y-4">
           <RichTextEditor value={html} onChange={setHtml} />
-          <input
-            type="file"
-            multiple
-            className="block text-sm mt-2"
-            onChange={(e) => setFiles(Array.from(e.target.files || []))}
-          />
           <div className="flex justify-end">
             <button
               onClick={submitNote}
@@ -158,21 +146,6 @@ export default function WorkroomPage() {
                   />
                 ) : (
                   <p>{n.content}</p>
-                )}
-                {n.attachments && n.attachments.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {n.attachments.map((a, i) => (
-                      <a
-                        key={i}
-                        href={a.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block text-sm underline text-blue-400"
-                      >
-                        {a.name || a.url}
-                      </a>
-                    ))}
-                  </div>
                 )}
               </div>
             ))

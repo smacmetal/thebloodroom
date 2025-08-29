@@ -1,26 +1,38 @@
-// /app/api/vault/route.ts
+  import { NextResponse } from "next/server";
+import { putJson } from "@/lib/s3";
 
-import { promises as fs } from 'fs';
-import path from 'path';
-
-const vaultDir = path.resolve(process.cwd(), 'vault');
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const data = await req.json();
-  const { id, title, content, author, archived } = data;
+  try {
+    const { id, title, content, author, archived } = await req.json();
 
-  const newMemory = {
-    id,
-    title,
-    body: content,
-    author,
-    date: new Date().toISOString(),
-    tags: [],
-    status: archived ? 'archived' : 'active',
-  };
+    if (!id || !title || !content || !author) {
+      return NextResponse.json(
+        { ok: false, error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
 
-  const filePath = path.join(vaultDir, `${id}.json`);
-  await fs.writeFile(filePath, JSON.stringify(newMemory, null, 2), 'utf8');
+    const newMemory = {
+      id,
+      title,
+      body: content,
+      author,
+      date: new Date().toISOString(),
+      tags: [],
+      status: archived ? "archived" : "active",
+    };
 
-  return new Response(JSON.stringify({ message: 'Memory saved' }), { status: 200 });
+    const key = `vault/${id}.json`;
+    await putJson(key, newMemory);
+
+    return NextResponse.json({ ok: true, message: "Memory saved", key });
+  } catch (err: any) {
+    console.error("[vault] Error:", err);
+    return NextResponse.json(
+      { ok: false, error: err.message || "Failed to save memory" },
+      { status: 500 }
+    );
+  }
 }

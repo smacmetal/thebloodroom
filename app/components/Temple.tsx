@@ -149,58 +149,58 @@ export default function Temple({
     });
   }
 
-async function send() {
-  const recipients: string[] = [];
-  if (sendToKing) recipients.push("King");
-  if (sendToQueen) recipients.push("Queen");
-  if (sendToPrincess) recipients.push("Princess");
+  async function send() {
+    const recipients: string[] = [];
+    if (sendToKing) recipients.push("King");
+    if (sendToQueen) recipients.push("Queen");
+    if (sendToPrincess) recipients.push("Princess");
 
-  const contentHtml = (mode === "rich" ? richHtml : htmlInput).trim();
-  const content = htmlToText(contentHtml);
+    const contentHtml = (mode === "rich" ? richHtml : htmlInput).trim();
+    const content = htmlToText(contentHtml);
 
-  if (!content && !contentHtml && localFiles.length === 0) {
-    alert("Please enter a message or attach a file.");
-    return;
-  }
-
-  // 👇 fetch current user id from API
-  let auth_id = "";
-  try {
-    const res = await fetch("/api/whoami");
-    if (res.ok) {
-      const j = await res.json();
-      auth_id = j?.id || "";
+    if (!content && !contentHtml && localFiles.length === 0) {
+      alert("Please enter a message or attach a file.");
+      return;
     }
-  } catch {}
 
-  const fd = new FormData();
-  fd.append("chamber", chamberKey);
-  fd.append("author", chamberLabel);
-  fd.append("format", mode);
-  fd.append("sms", String(!!sendAsSms));
-  fd.append("content", content);
-  fd.append("contentHtml", contentHtml);
-  if (auth_id) fd.append("auth_id", auth_id);
-  recipients.forEach((r) => fd.append("recipients", r));
-  localFiles.forEach((lf) => fd.append("files", lf.file, lf.file.name));
+    // fetch current user id
+    let auth_id = "";
+    try {
+      const res = await fetch("/api/whoami");
+      if (res.ok) {
+        const j = await res.json();
+        auth_id = j?.id || "";
+      }
+    } catch {}
 
-  try {
-    const res = await fetch("/api/temple/submit", { method: "POST", body: fd });
-    if (!res.ok) throw new Error(await res.text());
+    const fd = new FormData();
+    fd.append("chamber", chamberKey);
+    fd.append("author", chamberLabel);
+    fd.append("format", mode);
+    fd.append("sms", String(!!sendAsSms));
+    fd.append("content", content);
+    fd.append("contentHtml", contentHtml);
+    if (auth_id) fd.append("auth_id", auth_id);
+    recipients.forEach((r) => fd.append("recipients", r));
+    localFiles.forEach((lf) => fd.append("files", lf.file, lf.file.name));
 
-    setRichHtml("");
-    setHtmlInput("");
-    setLocalFiles((prev) => {
-      prev.forEach((lf) => lf.previewUrl && URL.revokeObjectURL(lf.previewUrl));
-      return [];
-    });
+    try {
+      const res = await fetch("/api/temple/submit", { method: "POST", body: fd });
+      if (!res.ok) throw new Error(await res.text());
 
-    await load(); // ✅ allowed inside async
-  } catch (e) {
-    console.error(e);
-    alert("Failed to send.");
+      setRichHtml("");
+      setHtmlInput("");
+      setLocalFiles((prev) => {
+        prev.forEach((lf) => lf.previewUrl && URL.revokeObjectURL(lf.previewUrl));
+        return [];
+      });
+
+      await load();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to send.");
+    }
   }
-}
 
   const recent = useMemo(() => messages, [messages]);
 
@@ -263,26 +263,13 @@ async function send() {
 
           {/* File input */}
           <div className="space-y-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              onChange={onPickFiles}
-              className="text-sm"
-            />
+            <input ref={fileInputRef} type="file" multiple onChange={onPickFiles} className="text-sm" />
             {localFiles.length > 0 && (
               <div className="flex gap-2 flex-wrap">
                 {localFiles.map((lf, i) => (
-                  <div
-                    key={i}
-                    className="relative w-20 h-20 border border-rose-600 rounded overflow-hidden"
-                  >
+                  <div key={i} className="relative w-20 h-20 border border-rose-600 rounded overflow-hidden">
                     {lf.previewUrl ? (
-                      <img
-                        src={lf.previewUrl}
-                        alt={lf.file.name}
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={lf.previewUrl} alt={lf.file.name} className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-xs p-1">{lf.file.name}</span>
                     )}
@@ -314,7 +301,11 @@ async function send() {
               To Queen
             </label>
             <label className="flex items-center gap-1">
-              <input type="checkbox" checked={sendToPrincess} onChange={(e) => setSendToPrincess(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={sendToPrincess}
+                onChange={(e) => setSendToPrincess(e.target.checked)}
+              />
               To Princess
             </label>
           </div>
@@ -332,30 +323,19 @@ async function send() {
         {/* Recent messages */}
         <div className="space-y-4">
           {loading && <p className="text-zinc-400">Loading messages…</p>}
-          {!loading && recent.length === 0 && (
-            <p className="text-zinc-400 italic">No messages yet.</p>
-          )}
+          {!loading && recent.length === 0 && <p className="text-zinc-400 italic">No messages yet.</p>}
           {recent.map((m) => (
-            <div
-              key={m.uid}
-              className="rounded-xl border border-[#4b2228] bg-[#1c0e12] p-4 space-y-2"
-            >
+            <div key={m.uid} className="rounded-xl border border-[#4b2228] bg-[#1c0e12] p-4 space-y-2">
               <div className="flex justify-between items-center text-sm text-zinc-400">
                 <span>
                   {m.author} — {new Date(m.timestamp || 0).toLocaleString()}
                 </span>
-                <button
-                  onClick={() => deleteMessage(m.uid)}
-                  className="text-red-500 hover:text-red-700"
-                >
+                <button onClick={() => deleteMessage(m.uid)} className="text-red-500 hover:text-red-700">
                   Delete
                 </button>
               </div>
               {m.contentHtml ? (
-                <div
-                  className="prose prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: m.contentHtml }}
-                />
+                <div className="prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: m.contentHtml }} />
               ) : (
                 <p>{m.content}</p>
               )}

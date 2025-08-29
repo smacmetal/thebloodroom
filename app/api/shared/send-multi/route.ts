@@ -1,57 +1,49 @@
- import { promises as fs } from "fs";
-import path from "path";
+ import { NextResponse } from "next/server";
+import { sendToRoles, MessagePayload } from "@/lib/sendToRoles";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
-    const { author, recipients, content, attachments } = await req.json();
+    const { author, recipients, content, attachments, meta } = await req.json();
 
     if (!author || !recipients || recipients.length === 0 || !content) {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+      return NextResponse.json(
+        { ok: false, error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    // Ensure recipients is always an array
-    const recipientArray = Array.isArray(recipients)
-      ? recipients
-      : [recipients];
-
-    const timestamp = Date.now();
-    const message = {
-      id: `${author}-${timestamp}`,
+    const payload: MessagePayload = {
       author,
-      recipients: recipientArray,
-      content,
+      text: String(content).trim(),
+      timestamp: new Date().toISOString(),
       attachments: attachments || [],
-      timestamp,
+      meta: meta || {},
     };
 
-    // Save a copy of the message into each recipient’s folder
-    for (const recipient of recipientArray) {
-      const dirPath = path.join(
-        process.cwd(),
-        "data",
-        recipient.toLowerCase(),
-        "messages"
-      );
+    const recipientArray = Array.isArray(recipients) ? recipients : [recipients];
 
-      const filePath = path.join(dirPath, `${timestamp}.json`);
+    const result = await sendToRoles(payload, recipientArray, {
+      writeRoleIndexes: true,
+    });
 
-      // Ensure directory exists
-      await fs.mkdir(dirPath, { recursive: true });
-
-      // Write JSON file
-      await fs.writeFile(filePath, JSON.stringify(message, null, 2), "utf-8");
-    }
-
-    return new Response(JSON.stringify({ success: true, message }), {
-      status: 200,
+    return NextResponse.json({
+      ok: true,
+      id: result.id,
+      idempotencyKey: result.idempotencyKey,
+      author,
+      recipients: recipientArray,
+      createdAt: payload.timestamp,
+      s3: {
+        canonicalKey: result.canonicalKey,
+        indexKeys: result.indexKeys,
+      },
     });
   } catch (err: any) {
     console.error("[send-multi] Error:", err);
-    return new Response(
-      JSON.stringify({ error: "Failed to send message", details: err.message }),
+    return NextResponse.json(
+      { ok: false, error: err.message || "Failed to send message" },
       { status: 500 }
     );
   }

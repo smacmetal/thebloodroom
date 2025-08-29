@@ -1,24 +1,30 @@
-// C:\Users\steph\thebloodroom\lib\sendToRoles.ts
+ import crypto from "crypto";
+import { putJson } from "@/lib/s3";
+import twilio from "twilio";
 
-import crypto from 'crypto';
-import { putJson } from '@/lib/s3';
-
-type Role = 'King' | 'Queen' | 'Princess';
+type Role = "King" | "Queen" | "Princess";
 
 export interface MessagePayload {
   text: string;
-  author: Role;       // enforce role typing
-  timestamp: string;  // ISO string
+  author: Role;
+  timestamp: string; // ISO string
   attachments?: { name: string; path: string }[];
   meta?: Record<string, any>;
 }
 
+const client = twilio(process.env.TWILIO_SID!, process.env.TWILIO_AUTH!);
+
+const roleNumbers: Record<Role, string> = {
+  King: process.env.KING_PHONE!,
+  Queen: process.env.QUEEN_PHONE!,
+  Princess: process.env.PRINCESS_PHONE!,
+};
+
 /**
- * NEW behavior:
- * - ONE canonical S3 write under messages/canonical/<id>.json
- * - OPTIONAL lightweight per-role index records under messages/index/<role>/<id>.json
- *   (Safe if your consumers only watch messages/canonical/)
- * - Idempotency key based on (author, recipients, text, timestamp)
+ * Unified behavior:
+ * - Canonical S3 write under messages/canonical/<id>.json
+ * - Optional per-role index records
+ * - Twilio SMS/MMS delivery to recipient roles
  */
 export async function sendToRoles(
   message: MessagePayload,
@@ -30,16 +36,16 @@ export async function sendToRoles(
   canonicalKey: string;
   indexKeys: string[];
 }> {
-  const text = String(message.text || '').trim();
-  if (!text) throw new Error('sendToRoles: empty message text');
+  const text = String(message.text || "").trim();
+  if (!text) throw new Error("sendToRoles: empty message text");
   if (!Array.isArray(recipients) || recipients.length === 0) {
-    throw new Error('sendToRoles: recipients required');
+    throw new Error("sendToRoles: recipients required");
   }
   if (!message.timestamp) {
-    throw new Error('sendToRoles: timestamp (ISO) required');
+    throw new Error("sendToRoles: timestamp (ISO) required");
   }
 
-  // Create a stable idempotency key for this logical send
+  // Idempotency key
   const idempotencyKey = computeIdempotencyKey({
     author: message.author,
     recipients: [...recipients].sort(),
@@ -47,10 +53,10 @@ export async function sendToRoles(
     timestamp: message.timestamp,
   });
 
-  // Create a unique id for storage & tracing
+  // Unique id
   const id = crypto.randomUUID();
 
-  // Canonical envelope stored ONCE
+  // Canonical envelope
   const canonical = {
     id,
     idempotencyKey,
@@ -62,11 +68,11 @@ export async function sendToRoles(
     meta: message.meta || {},
   };
 
-  // ---- SINGLE canonical write (the only key your processors should watch)
+  // ---- Canonical S3 write
   const canonicalKey = `messages/canonical/${safeStamp(message.timestamp)}-${id}.json`;
   await putJson(canonicalKey, canonical);
 
-  // ---- OPTIONAL: per-role lightweight indexes (do NOT hook processors to these)
+  // ---- Optional: per-role indexes
   const indexKeys: string[] = [];
   if (options?.writeRoleIndexes) {
     for (const role of recipients) {
@@ -74,13 +80,28 @@ export async function sendToRoles(
         id,
         idempotencyKey,
         role,
-        ref: canonicalKey, // pointer to canonical
+        ref: canonicalKey,
         timestamp: message.timestamp,
       };
       const key = `messages/index/${role.toLowerCase()}/${safeStamp(message.timestamp)}-${id}.json`;
       await putJson(key, idx);
       indexKeys.push(key);
     }
+  }
+
+  // ---- Twilio delivery (per recipient)
+  for (const role of recipients) {
+    const to = roleNumbers[role];
+    if (!to) continue;
+
+    await client.messages.create({
+      from: process.env.TWILIO_PHONE!,
+      to,
+      body: `${message.author}: ${text}`,
+      ...(message.attachments?.length
+        ? { mediaUrl: message.attachments.map((a) => a.path) }
+        : {}),
+    });
   }
 
   return { id, idempotencyKey, canonicalKey, indexKeys };
@@ -93,19 +114,18 @@ function computeIdempotencyKey(input: {
   text: string;
   timestamp: string;
 }) {
-  const h = crypto.createHash('sha256');
+  const h = crypto.createHash("sha256");
   h.update(
     JSON.stringify({
       a: input.author,
-      r: input.recipients, // already sorted by caller
+      r: input.recipients,
       t: input.text.trim(),
       ts: input.timestamp,
     })
   );
-  return h.digest('hex');
+  return h.digest("hex");
 }
 
 function safeStamp(iso: string) {
-  // S3 keys can include ":" but keeping it filesystem-friendly helps consistency
-  return iso.replace(/[:.]/g, '-');
+  return iso.replace(/[:.]/g, "-");
 }
