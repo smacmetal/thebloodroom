@@ -1,12 +1,12 @@
- import Temple from "@/app/components/Temple";
+import Temple from "@/app/components/Temple";
 
-export default function QueenPage() {
+export default function KingPage() {
   return (
     <Temple
-      chamberLabel="Queen"
-      title="♛ Queen’s Temple"
-      placeholder="Speak your will..."
-      sendButtonColor="#7a1f4d"
+      chamberLabel="King"
+      title="👑 King’s Temple"
+      placeholder="Write your decree..."
+      sendButtonColor="#b3121f"
     />
   );
 }
