@@ -15,9 +15,9 @@ type Message = {
   id?: string;
   author?: string;
   recipients?: string[];
-  content?: string;           // ""
-  contentHtml?: string;       // ""
-  attachments?: Attachment[]; // []
+  content?: string;
+  contentHtml?: string;
+  attachments?: Attachment[];
   timestamp?: number;
   chamber: "King" | "Queen" | "Princess";
 };
@@ -39,9 +39,20 @@ export default function VaultPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (c && c !== "All") params.set("chamber", c.toLowerCase());
+
+      if (c && c !== "All") {
+        params.set("chamber", c.toLowerCase());
+      } else {
+        // default chamber=all so backend won't 400
+        params.set("chamber", "all");
+      }
+
       if (q.trim()) params.set("q", q.trim());
-      const res = await fetch(`/api/vault/archive/messages?${params.toString()}`);
+
+      const qs = params.toString();
+      const res = await fetch(`/api/vault/archive/messages${qs ? "?" + qs : ""}`);
+      if (!res.ok) throw new Error(await res.text());
+
       const data = await res.json();
       setMessages((data.messages || []) as Message[]);
     } catch (e) {
@@ -83,7 +94,7 @@ export default function VaultPage() {
   return (
     <div className="min-h-screen p-6 bg-[#0b0709] text-[#fbe9ed]">
       <div className="max-w-5xl mx-auto space-y-6">
-        {/* Title Card (header) */}
+        {/* Title Card */}
         <div className="mb-6 rounded-2xl border border-[#4b2228] bg-[#261217] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,.05)]">
           <h1 className="text-2xl font-bold text-[#ffe0e7] flex items-center gap-2">
             <span role="img" aria-label="vault">🔒</span> The Vault
@@ -163,7 +174,7 @@ export default function VaultPage() {
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="text-xs text-[#e0a8b1]">
-                            {new Date(ts).toLocaleString()}
+                            {ts ? new Date(ts).toLocaleString() : "Invalid Date"}
                           </div>
                           <button
                             onClick={() => deleteMessage(m.uid)}
@@ -195,10 +206,9 @@ export default function VaultPage() {
                                 href={a.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="block rounded-lg overflow-hidden border border-[#4b2228] hover:border-[#95313c]"
+                                className="block rounded-lg overflow-hidden border border-[#4b2228] hover:border-[#95313c] transition"
                                 title={a.name || a.path}
                               >
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={a.thumbUrl || a.url}
                                   alt={a.name || "attachment"}
@@ -215,7 +225,7 @@ export default function VaultPage() {
                                 href={a.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-sm underline text-[#ffd7de]"
+                                className="text-sm underline text-[#ffd7de] transition"
                                 title={a.name || a.path}
                               >
                                 {a.name || a.path}
@@ -226,7 +236,12 @@ export default function VaultPage() {
                       )}
 
                       <div className="mt-3 text-xs text-[#d7aeb6]">
-                        Chamber: {m.chamber === "Queen" ? "👑 Queen" : m.chamber === "Princess" ? "💎 Princess" : "🩸 King"}
+                        Chamber:{" "}
+                        {m.chamber === "Queen"
+                          ? "👑 Queen"
+                          : m.chamber === "Princess"
+                          ? "💎 Princess"
+                          : "🩸 King"}
                       </div>
                     </li>
                   );

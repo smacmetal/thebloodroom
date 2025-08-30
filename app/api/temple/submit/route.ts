@@ -1,51 +1,38 @@
 import { NextResponse } from "next/server";
-import { sendToRoles, MessagePayload } from "@/lib/sendToRoles";
+import { supabase } from "../../../lib/supabase"; // Corrected path to supabase
+import { uploadAttachment } from "../../../lib/upload"; // Corrected path to upload
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const { content, chamber, attachments, auth_id, sms } = await req.json();
+  
+  // Upload attachments if any
+  const attachmentPromises = attachments?.map((file: any) => {
+    return uploadAttachment(file, chamber); // Calls the upload function
+  });
+
   try {
-    const { author, recipients, content, attachments, meta } = await req.json();
+    // Wait for all uploads to complete
+    const uploadedAttachments = attachmentPromises ? await Promise.all(attachmentPromises) : [];
+    
+    // Save message to database
+    const { data, error } = await supabaseAdmin
+      .from("messages")
+      .insert([
+        {
+          content,
+          chamber,
+          author: auth_id,
+          attachments: uploadedAttachments,
+          sms,
+        },
+      ]);
 
-    if (!author || !recipients || recipients.length === 0 || !content) {
-      return NextResponse.json(
-        { ok: false, error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
+    if (error) throw new Error(error.message);
 
-    const payload: MessagePayload = {
-      author,
-      text: String(content).trim(),
-      timestamp: new Date().toISOString(),
-      attachments: attachments || [],
-      meta: meta || {},
-    };
-
-    const recipientArray = Array.isArray(recipients) ? recipients : [recipients];
-
-    const result = await sendToRoles(payload, recipientArray, {
-      writeRoleIndexes: true,
-    });
-
-    return NextResponse.json({
-      ok: true,
-      id: result.id,
-      idempotencyKey: result.idempotencyKey,
-      author,
-      recipients: recipientArray,
-      createdAt: payload.timestamp,
-      s3: {
-        canonicalKey: result.canonicalKey,
-        indexKeys: result.indexKeys,
-      },
-    });
-  } catch (err: any) {
-    console.error("[temple/submit] Error:", err);
-    return NextResponse.json(
-      { ok: false, error: err.message || "Failed to submit temple message" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
- 

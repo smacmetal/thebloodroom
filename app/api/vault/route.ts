@@ -1,37 +1,71 @@
-  import { NextResponse } from "next/server";
-import { putJson } from "@/lib/s3";
+ // C:\Users\steph\thebloodroom\app\api\vault\route.ts
 
-export const dynamic = "force-dynamic";
+import { NextResponse } from "next/server";
 
+// temporary in-memory store (replace with Supabase/DB later)
+let VAULT: any[] = [];
+
+/**
+ * POST /api/vault
+ * Accepts { chamber, author, content, content_html, auth_id, sms, recipients }
+ * Stamps a timestamp + uid and saves into Vault.
+ */
 export async function POST(req: Request) {
   try {
-    const { id, title, content, author, archived } = await req.json();
+    const body = await req.json();
+    const {
+      chamber = "workroom",
+      author = "unknown",
+      content = "",
+      content_html = "",
+      auth_id = "",
+      sms = false,
+      recipients = [],
+    } = body;
 
-    if (!id || !title || !content || !author) {
+    if (!content && !content_html) {
       return NextResponse.json(
-        { ok: false, error: "Missing required fields" },
+        { ok: false, error: "Missing message content." },
         { status: 400 }
       );
     }
 
-    const newMemory = {
-      id,
-      title,
-      body: content,
+    const saved = {
+      id: Date.now().toString(), // unique enough for now
+      chamber,
       author,
-      date: new Date().toISOString(),
-      tags: [],
-      status: archived ? "archived" : "active",
+      content,
+      content_html,
+      auth_id,
+      recipients,
+      sms,
+      createdAt: new Date().toISOString(),
     };
 
-    const key = `vault/${id}.json`;
-    await putJson(key, newMemory);
+    VAULT.unshift(saved); // add to top
+    console.log("[vault] Saved:", saved);
 
-    return NextResponse.json({ ok: true, message: "Memory saved", key });
+    return NextResponse.json({ ok: true, saved });
   } catch (err: any) {
-    console.error("[vault] Error:", err);
+    console.error("[vault POST] Error:", err);
     return NextResponse.json(
-      { ok: false, error: err.message || "Failed to save memory" },
+      { ok: false, error: err?.message || "Server error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * GET /api/vault
+ * Returns everything in the Vault.
+ */
+export async function GET() {
+  try {
+    return NextResponse.json({ ok: true, messages: VAULT });
+  } catch (err: any) {
+    console.error("[vault GET] Error:", err);
+    return NextResponse.json(
+      { ok: false, error: err?.message || "Server error" },
       { status: 500 }
     );
   }

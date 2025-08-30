@@ -1,12 +1,27 @@
+ # Node modules
 node_modules/
+
+# Next.js build directory
 .next/
+
+# Static export folder
 out/
 
-data/
-uploads/
+# Environment files (local & sensitive)
 .env*
+.env.local
+.env.production.local
+.env.development.local
+
+# OS generated files
 .DS_Store
+
+# TypeScript build info
 *.tsbuildinfo
 
-.vercel
-.env*.local
+# Vercel deployment settings
+.vercel/
+
+# Temporary directories
+data/
+uploads/

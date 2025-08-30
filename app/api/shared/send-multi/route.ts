@@ -1,4 +1,5 @@
- import { NextResponse } from "next/server";
+ // C:\Users\steph\thebloodroom\app\api\shared\send-multi\route.ts
+import { NextResponse } from "next/server";
 import { sendToRoles, MessagePayload } from "@/lib/sendToRoles";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,12 @@ export async function POST(req: Request) {
       );
     }
 
+    // Normalize recipients into array
+    const recipientArray = Array.isArray(recipients)
+      ? recipients
+      : [recipients];
+
+    // Build canonical payload
     const payload: MessagePayload = {
       author,
       text: String(content).trim(),
@@ -22,8 +29,7 @@ export async function POST(req: Request) {
       meta: meta || {},
     };
 
-    const recipientArray = Array.isArray(recipients) ? recipients : [recipients];
-
+    // Send to roles (S3 persistence + Twilio SMS/MMS delivery)
     const result = await sendToRoles(payload, recipientArray, {
       writeRoleIndexes: true,
     });

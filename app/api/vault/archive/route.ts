@@ -1,30 +1,40 @@
- import { NextResponse } from "next/server";
-import { uploadToS3 } from "@/lib/s3";
+ // C:\Users\steph\thebloodroom\app\api\vault\archive\route.ts
+
+import { NextResponse } from "next/server";
+import { putJson } from "@/lib/s3";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
-    const formData = await req.formData();
-    const author = formData.get("author") as string;
-    const content = formData.get("content") as string;
-    const file = formData.get("file") as File | null;
+    const { id, title, content, author, archived } = await req.json();
 
-    let imageUrl: string | null = null;
-    if (file) {
-      imageUrl = await uploadToS3(file, `vault/${author}/${Date.now()}-${file.name}`);
+    if (!id || !title || !content || !author) {
+      return NextResponse.json(
+        { ok: false, error: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
-    const entry = {
+    const newMemory = {
+      id,
+      title,
+      body: content,
       author,
-      content,
-      imageUrl,
-      archivedAt: new Date().toISOString(),
+      date: new Date().toISOString(),
+      tags: [],
+      status: archived ? "archived" : "active",
     };
 
-    return NextResponse.json({ success: true, entry });
+    const key = `vault/archive/${id}.json`;
+    await putJson(key, newMemory);
+
+    return NextResponse.json({ ok: true, message: "Memory saved", key });
   } catch (err: any) {
-    console.error("Vault archive error:", err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    console.error("[vault/archive] Error:", err);
+    return NextResponse.json(
+      { ok: false, error: err.message || "Failed to save memory" },
+      { status: 500 }
+    );
   }
 }

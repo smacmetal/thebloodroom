@@ -1,80 +1,113 @@
- // C:\Users\steph\thebloodroom\app\components\WorkroomEditor.tsx
+// C:\Users\steph\thebloodroom\app\components\WorkroomEditor.tsx
+
 "use client";
 
-import { useState } from "react";
-import RichTextEditor from "@/app/components/RichTextEditor";
+import { useState, useEffect } from "react";
+
+type Message = {
+  id: string;
+  author: string;
+  chamber: string;
+  body: string;
+  createdAt: string;
+};
 
 export default function WorkroomEditor() {
-  const [mode, setMode] = useState<"rich" | "html">("rich");
-  const [richHtml, setRichHtml] = useState("");
-  const [htmlInput, setHtmlInput] = useState("");
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  function clearAll() {
-    if (!confirm("Clear the editor?")) return;
-    setRichHtml("");
-    setHtmlInput("");
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/vault/archive/messages?chamber=workroom");
+      const data = await res.json();
+      setMessages(data.messages || []);
+    } catch (e) {
+      console.error("Workroom load failed:", e);
+      setMessages([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function copyHtml() {
-    const html = mode === "rich" ? richHtml : htmlInput;
-    navigator.clipboard.writeText(html).then(
-      () => alert("HTML copied."),
-      () => alert("Could not copy HTML.")
-    );
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setStatus("Submitting…");
+
+    try {
+      const form = {
+        chamber: "workroom",
+        author: "Workroom",
+        message,
+      };
+
+      const res = await fetch("/api/temple/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt);
+      }
+
+      const data = await res.json();
+      setStatus(data.ok ? "Message saved to Vault ✅" : "Failed to save ❌");
+      setMessage("");
+      await load();
+    } catch (err: any) {
+      console.error(err);
+      setStatus(`Error: ${err?.message || "Unknown error"}`);
+    }
   }
+
+  useEffect(() => {
+    load();
+  }, []);
 
   return (
-    <div className="space-y-3">
-      {/* Toolbar row */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          className={`px-3 py-1 rounded-full border ${
-            mode === "html"
-              ? "bg-[#2a0f12] border-[#7e2a33] text-[#ffd7de]"
-              : "bg-[#170c0f] border-[#3a1b20] text-[#d7aeb6] hover:bg-[#1e0f12]"
-          }`}
-          onClick={() => setMode(mode === "rich" ? "html" : "rich")}
-        >
-          {mode === "rich" ? "HTML" : "Rich"}
-        </button>
-        <button
-          className="px-2 py-1 border rounded-md border-[#3a1b20] hover:bg-[#1e0f12]"
-          onClick={copyHtml}
-        >
-          Copy HTML
-        </button>
-        <button
-          className="px-2 py-1 border rounded-md border-[#3a1b20] hover:bg-[#1e0f12]"
-          onClick={clearAll}
-        >
-          Clear
-        </button>
-      </div>
+    <div className="rounded-2xl border border-[#3a1b20] bg-[#1c0e12] p-5 space-y-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <textarea
+          className="rounded bg-[#14090c] border border-[#3a1b20] p-2 text-sm"
+          rows={3}
+          placeholder="Lay down your work, it will be etched in the Vault…"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+        />
 
-      {/* Editors */}
-      {mode === "rich" ? (
-        <RichTextEditor value={richHtml} onChange={setRichHtml} />
-      ) : (
-        <>
-          <textarea
-            className="w-full min-h-[40vh] rounded-2xl bg-[#14090c] border border-[#3a1b20] p-4 text-[#ffd7de] outline-none font-mono text-sm"
-            value={htmlInput}
-            onChange={(e) => setHtmlInput(e.target.value)}
-            placeholder="Write or paste raw HTML…"
-          />
-          <div className="text-xs text-[#b98790]">Preview:</div>
+        <button
+          type="submit"
+          className="self-start px-4 py-2 rounded-xl bg-[#b3121f] text-white hover:bg-[#d11423] transition"
+        >
+          Send to Vault
+        </button>
+      </form>
+
+      {status && <div className="text-sm mt-2 opacity-90">{status}</div>}
+
+      <div className="space-y-2 mt-6">
+        {loading && <p className="text-zinc-400">Loading messages…</p>}
+        {!loading && messages.length === 0 && (
+          <p className="text-zinc-400 italic">No messages yet.</p>
+        )}
+        {messages.map((m) => (
           <div
-            className="rounded-2xl bg-[#14090c] border border-[#3a1b20] p-4 text-[#ffd7de]"
-            dangerouslySetInnerHTML={{ __html: htmlInput }}
-          />
-        </>
-      )}
-
-      <div className="text-xs text-[#b98790]">
-        Tip: <span className="font-mono">Ctrl/⌘ + Enter</span> to save (we can
-        wire this to storage anytime).
+            key={m.id}
+            className="rounded-lg border border-[#3a1b20] bg-[#14090c] p-3 text-sm"
+          >
+            <div className="flex justify-between text-xs text-zinc-400">
+              <span>
+                {m.author} — {new Date(m.createdAt).toLocaleString()}
+              </span>
+            </div>
+            <p className="mt-1">{m.body}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
-

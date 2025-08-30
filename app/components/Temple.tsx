@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import RichTextEditor from "@/app/components/RichTextEditor";
+import { uploadAttachment } from "@/app/lib/upload"; // <-- NEW
 
 const POLL_INTERVAL = Number(process.env.NEXT_PUBLIC_POLL_INTERVAL || 5000);
 
@@ -13,8 +14,8 @@ type Attachment = {
   name?: string;
   path: string;
   type?: string;
-  url: string;
-  thumbUrl: string;
+  url?: string;
+  thumbUrl?: string;
 };
 
 type SmsResult = {
@@ -25,15 +26,14 @@ type SmsResult = {
 };
 
 type Message = {
-  uid: string;
-  id?: string;
+  id: string;
   author?: string;
   recipients?: string[];
   content?: string;
-  contentHtml?: string;
+  content_html?: string;
   attachments?: Attachment[];
-  timestamp?: number;
-  chamber: Chamber;
+  createdAt?: string;
+  chamber: ChamberKey;
   smsResults?: SmsResult[];
 };
 
@@ -108,10 +108,10 @@ export default function Temple({
     }
   }
 
-  async function deleteMessage(uid: string) {
+  async function deleteMessage(id: string) {
     if (!confirm("Delete this entry? This cannot be undone.")) return;
     try {
-      const res = await fetch(`/api/vault/archive/messages?uid=${encodeURIComponent(uid)}`, {
+      const res = await fetch(`/api/vault/archive/messages?uid=${encodeURIComponent(id)}`, {
         method: "DELETE",
       });
       const json = await res.json();
@@ -140,6 +140,7 @@ export default function Temple({
     setLocalFiles((prev) => prev.concat(next));
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
+
   function removeLocalFile(idx: number) {
     setLocalFiles((prev) => {
       const copy = [...prev];
@@ -155,10 +156,10 @@ export default function Temple({
     if (sendToQueen) recipients.push("Queen");
     if (sendToPrincess) recipients.push("Princess");
 
-    const contentHtml = (mode === "rich" ? richHtml : htmlInput).trim();
-    const content = htmlToText(contentHtml);
+    const content_html = (mode === "rich" ? richHtml : htmlInput).trim();
+    const content = htmlToText(content_html);
 
-    if (!content && !contentHtml && localFiles.length === 0) {
+    if (!content && !content_html && localFiles.length === 0) {
       alert("Please enter a message or attach a file.");
       return;
     }
@@ -173,19 +174,36 @@ export default function Temple({
       }
     } catch {}
 
-    const fd = new FormData();
-    fd.append("chamber", chamberKey);
-    fd.append("author", chamberLabel);
-    fd.append("format", mode);
-    fd.append("sms", String(!!sendAsSms));
-    fd.append("content", content);
-    fd.append("contentHtml", contentHtml);
-    if (auth_id) fd.append("auth_id", auth_id);
-    recipients.forEach((r) => fd.append("recipients", r));
-    localFiles.forEach((lf) => fd.append("files", lf.file, lf.file.name));
+    // Upload local files to Supabase Storage
+    const uploaded: Attachment[] = [];
+    for (const lf of localFiles) {
+      try {
+        const result = await uploadAttachment(lf.file, chamberKey);
+        uploaded.push(result);
+      } catch (err) {
+        console.error("Upload failed:", err);
+      }
+    }
+
+    const payload = {
+      chamber: chamberKey,
+      author: chamberLabel,
+      format: mode,
+      sms: !!sendAsSms,
+      content,
+      content_html,
+      auth_id,
+      recipients,
+      attachments: uploaded,
+      meta: {},
+    };
 
     try {
-      const res = await fetch("/api/temple/submit", { method: "POST", body: fd });
+      const res = await fetch("/api/temple/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       if (!res.ok) throw new Error(await res.text());
 
       setRichHtml("");
@@ -232,24 +250,19 @@ export default function Temple({
             <button
               type="button"
               onClick={() => setMode("rich")}
-              className={`px-3 py-1 rounded ${
-                mode === "rich" ? "bg-rose-700 text-white" : "bg-black/40 text-zinc-300"
-              }`}
+              className={`px-3 py-1 rounded ${mode === "rich" ? "bg-rose-700 text-white" : "bg-black/40 text-zinc-300"}`}
             >
               Rich Text
             </button>
             <button
               type="button"
               onClick={() => setMode("html")}
-              className={`px-3 py-1 rounded ${
-                mode === "html" ? "bg-rose-700 text-white" : "bg-black/40 text-zinc-300"
-              }`}
+              className={`px-3 py-1 rounded ${mode === "html" ? "bg-rose-700 text-white" : "bg-black/40 text-zinc-300"}`}
             >
               Raw HTML
             </button>
           </div>
 
-          {/* Editor */}
           {mode === "rich" ? (
             <RichTextEditor value={richHtml} onChange={setRichHtml} />
           ) : (
@@ -301,11 +314,7 @@ export default function Temple({
               To Queen
             </label>
             <label className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={sendToPrincess}
-                onChange={(e) => setSendToPrincess(e.target.checked)}
-              />
+              <input type="checkbox" checked={sendToPrincess} onChange={(e) => setSendToPrincess(e.target.checked)} />
               To Princess
             </label>
           </div>
@@ -325,17 +334,20 @@ export default function Temple({
           {loading && <p className="text-zinc-400">Loading messages…</p>}
           {!loading && recent.length === 0 && <p className="text-zinc-400 italic">No messages yet.</p>}
           {recent.map((m) => (
-            <div key={m.uid} className="rounded-xl border border-[#4b2228] bg-[#1c0e12] p-4 space-y-2">
+            <div key={m.id} className="rounded-xl border border-[#4b2228] bg-[#1c0e12] p-4 space-y-2">
               <div className="flex justify-between items-center text-sm text-zinc-400">
                 <span>
-                  {m.author} — {new Date(m.timestamp || 0).toLocaleString()}
+                  {m.author} — {m.createdAt ? new Date(m.createdAt).toLocaleString() : "Invalid Date"}
                 </span>
-                <button onClick={() => deleteMessage(m.uid)} className="text-red-500 hover:text-red-700">
+                <button onClick={() => deleteMessage(m.id)} className="text-red-500 hover:text-red-700">
                   Delete
                 </button>
               </div>
-              {m.contentHtml ? (
-                <div className="prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: m.contentHtml }} />
+              {m.content_html ? (
+                <div
+                  className="prose prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: m.content_html }}
+                />
               ) : (
                 <p>{m.content}</p>
               )}

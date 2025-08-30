@@ -1,115 +1,60 @@
- // app/api/attachments/sign/route.ts
-import type { NextRequest } from "next/server";
+ // C:\Users\steph\thebloodroom\app\api\attachments\sign\route.ts
+
+import { NextResponse } from "next/server";
 
 /**
- * Minimal filename sanitizer. Keeps letters, numbers, dots, dashes, underscores.
+ * attachments/sign
+ * - Returns a "signed URL" or a "pathname" the uploader can use.
+ * - Here we fake a signer: in production you’d integrate with Vercel Blob, AWS S3, or Supabase.
  */
-function sanitizeFilename(name: string) {
-  return (name || "file")
-    .replace(/[^a-zA-Z0-9._-]/g, "_")
-    .replace(/_+/g, "_")
-    .slice(0, 180);
-}
-
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const body = (await req.json().catch(() => ({}))) as {
-      filename?: string;
-      contentType?: string;
-      prefix?: string;
-      access?: "public" | "private";
-    };
+    const body = await req.json();
+    const filename = body.filename as string;
+    const contentType = body.contentType as string;
+    const prefix = body.prefix as string;
+    const access = body.access || "public";
 
-    const filename = sanitizeFilename(body.filename ?? "upload.bin");
-    const contentType = body.contentType || "application/octet-stream";
-    const prefix = (body.prefix || "uploads").replace(/^\/+|\/+$/g, ""); // no leading/trailing slashes
-    const access = body.access === "private" ? "private" : "public";
-
-    // Path under your bucket/namespace
-    const pathname = `${prefix}/${Date.now()}-${filename}`;
-
-    // Try to use @vercel/blob only if the token exists
-    const token =
-      process.env.BLOB_READ_WRITE_TOKEN ||
-      process.env.VERCEL_BLOB_READ_WRITE_TOKEN;
-
-    if (token) {
-      // Dynamic import to avoid build errors if the package API shifts
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const mod: any = await import("@vercel/blob");
-
-      // Prefer the newer API if available
-      if (typeof mod.generateClientDrop === "function") {
-        const signed = await mod.generateClientDrop({
-          token,
-          pathname, // where the client will PUT to
-          expiresIn: "1h",
-          access, // "public" or "private"
-          allowedContentTypes: [
-            "image/*",
-            "video/*",
-            "application/pdf",
-            "text/plain",
-            "application/octet-stream",
-          ],
-          contentType,
-        });
-
-        // Shape contains: url (PUT), token, pathname, etc.
-        return Response.json(
-          {
-            ok: true,
-            mode: "vercel-blob",
-            pathname,
-            ...signed,
-          },
-          { status: 200 }
-        );
-      }
-
-      // Older API fallback (was previously generateUploadUrl or similar).
-      if (typeof mod.generateUploadUrl === "function") {
-        const signed = await mod.generateUploadUrl({
-          token,
-          expires: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-          contentType,
-          pathname,
-          access,
-        });
-        return Response.json(
-          {
-            ok: true,
-            mode: "vercel-blob-legacy",
-            pathname,
-            ...signed,
-          },
-          { status: 200 }
-        );
-      }
+    if (!filename) {
+      return NextResponse.json(
+        { ok: false, error: "Missing filename" },
+        { status: 400 }
+      );
     }
 
-    // No token or API not available:
-    // Tell the client to use your server-side upload route instead (e.g., /api/workroom/upload).
-    return Response.json(
-      {
+    // Build a pathname (server-fallback mode)
+    const safeName = filename.replace(/[^\w\.\-]/g, "_");
+    const pathname = `${prefix}/${Date.now()}-${safeName}`;
+
+    // Example: toggle between vercel-blob mode and fallback
+    const mode: "vercel-blob" | "fallback" = process.env.BLOB_MODE
+      ? "vercel-blob"
+      : "fallback";
+
+    if (mode === "vercel-blob") {
+      // If you had Vercel Blob configured, you’d call its SDK here
+      // and return { mode: "vercel-blob", url: signedUrl }
+      return NextResponse.json({
         ok: true,
-        mode: "fallback",
+        mode,
+        url: "https://example.com/fake-signed-url",
         pathname,
-        note:
-          "Blob signing is not configured. Upload using your server route (/api/workroom/upload) with multipart/form-data.",
-      },
-      { status: 200 }
-    );
+      });
+    }
+
+    // Fallback: just tell the client to POST to /api/workroom/upload
+    return NextResponse.json({
+      ok: true,
+      mode: "fallback",
+      pathname,
+      access,
+      hint: "No blob service set, will fallback to /api/workroom/upload",
+    });
   } catch (err: any) {
-    console.error("attachments/sign error:", err);
-    return Response.json(
-      {
-        ok: false,
-        error: err?.message || "Unexpected error in attachments/sign",
-      },
+    console.error("[attachments/sign] Error:", err);
+    return NextResponse.json(
+      { ok: false, error: err?.message || String(err) },
       { status: 500 }
     );
   }
 }
-
-export const dynamic = "force-dynamic"; // ensure no caching of tokens
